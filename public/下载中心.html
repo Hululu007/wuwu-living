@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>下载中心 · 五五客厅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='28' font-family='serif' fill='%235fada8' text-anchor='middle'%3E下%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/room.css">
+<style>
+  .task{
+    display:flex;flex-direction:column;gap:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.042),rgba(255,255,255,.012));
+    border:1px solid var(--line);border-radius:11px;padding:15px 16px;transition:.18s;
+  }
+  .task:hover{border-color:var(--edge)}
+  .task-h{display:flex;align-items:baseline;gap:9px;min-width:0}
+  .task-h b{font-size:14.5px;font-weight:600;letter-spacing:.02em;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .task-h .kind{font-size:10px;color:var(--a);background:var(--soft);padding:2px 6px;border-radius:4px;flex:0 0 auto}
+  .task-h .when{margin-left:auto;font-size:10.5px;color:var(--faint);flex:0 0 auto}
+  .state{font-size:10.5px;letter-spacing:.04em;padding:2px 8px;border-radius:999px;flex:0 0 auto}
+  .state.active{background:var(--soft);color:var(--a)}
+  .state.waiting{background:var(--soft);color:var(--a)}
+  .state.paused{background:rgba(214,160,94,.14);color:var(--warn)}
+  .state.done{background:rgba(127,187,140,.13);color:var(--ok)}
+  .state.error{background:rgba(221,119,104,.13);color:var(--danger)}
+  .task-m{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+  .task-m .bar{flex:1;min-width:120px}
+  .task-m .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .task-m .num b{color:var(--ink);font-weight:600}
+  .task-err{font-size:11.5px;color:var(--danger);line-height:1.7}
+  .task-note{font-size:11.5px;color:var(--faint);line-height:1.7}
+  .task-f{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .task-f .src{font-size:10.5px;color:var(--faint);margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+  .filters{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+  .stat-inline{font-size:11px;color:var(--faint);letter-spacing:.04em}
+  .compose{display:flex;flex-direction:column;gap:11px}
+  .compose .row{display:flex;gap:9px;flex-wrap:wrap}
+  .compose .row > *{flex:1;min-width:150px}
+  .sec-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .magnet-note{font-size:11px;color:var(--faint);line-height:1.8}
+  .chk{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer}
+  .chk input{accent-color:var(--a)}
+</style>
+</head>
+<body data-room="download">
+<div class="grain" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="top">
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <div class="titlebar">
+      <h1><i></i>下载中心</h1>
+      <span class="sub">直链流式落盘，磁力排队拉取，断点可以续</span>
+    </div>
+    <div class="top-act">
+      <button class="btn ghost" id="btnClear" type="button">清空已完成</button>
+      <button class="btn primary" id="btnNew" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        加入下载
+      </button>
+    </div>
+  </header>
+
+  <section class="lede">
+    <p>直链走 Node 自带 fetch 边下边写，临时文件 .part，下完再改名；磁力用 webtorrent 惰性加载，没装好也不影响直链。<br>进度、速度、剩余时间都在这一面墙上看。</p>
+    <div class="figs">
+      <div class="fig"><b id="fTotal">—</b><span>全部任务</span></div>
+      <div class="fig"><b id="fActive">—</b><span>进行中</span></div>
+      <div class="fig"><b id="fPaused">—</b><span>已暂停</span></div>
+      <div class="fig"><b id="fSpeed">—</b><span>合计速度</span></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <div class="filters" id="filters"></div>
+    <span class="stat-inline" id="dirLabel"></span>
+    <span class="stat-inline" id="magnetNote"></span>
+  </div>
+
+  <div id="list" class="grid"></div>
+
+  <footer class="foot">
+    <span>数据落在 runtime/download.json · 重启客厅也在</span>
+    <span id="updated">—</span>
+  </footer>
+</div>
+
+<!-- 加入下载 -->
+<div class="modal" id="modal" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h3>加入下载</h3>
+      <button class="btn ghost icon x" id="btnClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="compose">
+      <div>
+        <div class="sec-row" style="margin-bottom:7px">直链下载（http / https）</div>
+        <div class="row">
+          <input class="input" id="nUrl" placeholder="https://… 文件直链">
+          <input class="input" id="nName" placeholder="保存名称（可留空，取链接文件名）">
+        </div>
+      </div>
+      <div>
+        <div class="sec-row" style="margin-bottom:7px">磁力下载</div>
+        <textarea class="textarea" id="nMagnet" placeholder="magnet:?xt=urn:btih:…"></textarea>
+        <div class="magnet-note">磁力任务第一次加入时才加载组件；若组件没装好，会在任务上如实显示，直链不受影响。</div>
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn ghost" id="btnCancel" type="button">算了</button>
+        <button class="btn primary" id="btnSave" type="button">开始下载</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="modal" id="delModal" aria-hidden="true">
+  <div class="sheet" style="width:min(480px,92vw)">
+    <div class="sheet-h">
+      <h3>删除任务</h3>
+      <button class="btn ghost icon x" id="delClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="compose">
+      <div class="magnet-note" id="delName" style="font-size:12.5px;color:var(--ink)"></div>
+      <label class="chk"><input type="checkbox" id="delFile"> 同时删除已下载的文件（默认只删任务记录）</label>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn ghost" id="delCancel" type="button">取消</button>
+        <button class="btn danger" id="delConfirm" type="button">删除</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 播放弹层 -->
+<div class="modal" id="playerModal" aria-hidden="true">
+  <div class="sheet" style="width:min(860px,94vw)">
+    <div class="sheet-h">
+      <h3 id="playerTitle">播放</h3>
+      <button class="btn ghost icon x" id="playerClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div id="playerBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var S = { filter: '', items: [], totals: null, magnet: null, dir: '', deleting: null, saving: false };
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+
+  function toast(msg, err) {
+    var t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.className = 'toast'; }, 2400);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(2) + ' MB';
+    return (n / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  }
+
+  function fmtSpeed(n) { return fmtBytes(n) + '/s'; }
+
+  function fmtEta(ms) {
+    if (ms == null || !isFinite(ms) || ms <= 0) return '—';
+    var s = Math.round(ms / 1000);
+    if (s < 60) return '约 ' + s + ' 秒';
+    if (s < 3600) return '约 ' + Math.floor(s / 60) + ' 分 ' + (s % 60) + ' 秒';
+    return '约 ' + Math.floor(s / 3600) + ' 时 ' + Math.floor((s % 3600) / 60) + ' 分';
+  }
+
+  function when(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts), diff = (Date.now() - ts) / 1000;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+
+  function api(path, body) {
+    return fetch('/api/download' + path, body === undefined
+      ? { cache: 'no-store' }
+      : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json(); });
+  }
+
+  function findTask(id) {
+    for (var i = 0; i < S.items.length; i++) if (S.items[i].id === id) return S.items[i];
+    return null;
+  }
+
+  function openPlayer(t) {
+    var body = $('#playerBody');
+    if (t.media === 'audio') {
+      body.innerHTML = '<audio id="mediaEl" controls preload="metadata" style="width:100%"></audio>';
+    } else {
+      body.innerHTML = '<video id="mediaEl" controls playsinline preload="metadata" style="width:100%;max-height:62vh;background:#000;border-radius:12px;display:block"></video>';
+    }
+    var el = $('#mediaEl');
+    el.src = '/api/download/file?id=' + encodeURIComponent(t.id);
+    $('#playerTitle').textContent = t.name;
+    $('#playerModal').classList.add('on');
+    $('#playerModal').setAttribute('aria-hidden', 'false');
+    el.play().catch(function () { /* 用户可点控件自行播放 */ });
+  }
+
+  function closePlayer() {
+    var el = $('#mediaEl');
+    if (el) { el.pause(); el.removeAttribute('src'); }
+    $('#playerModal').classList.remove('on');
+    $('#playerModal').setAttribute('aria-hidden', 'true');
+  }
+
+  function openLibrary(t) {
+    var abs = t.file && t.file.path;
+    if (!abs) { toast('还没有落盘文件', true); return; }
+    location.href = location.origin + '/library/?focus=' + encodeURIComponent(abs);
+  }
+
+  var FILTERS = [
+    ['', '全部'], ['active', '进行中'], ['waiting', '等待节点'], ['paused', '已暂停'], ['done', '已完成'], ['error', '出错'],
+  ];
+
+  function renderFilters() {
+    var el = $('#filters');
+    el.innerHTML = FILTERS.map(function (f) {
+      return '<span class="chip btn-ish' + (S.filter === f[0] ? ' on' : '') + '" data-f="' + f[0] + '">' + esc(f[1]) + '</span>';
+    }).join('');
+    Array.prototype.forEach.call(el.children, function (c) {
+      c.onclick = function () { S.filter = c.getAttribute('data-f'); paint(); };
+    });
+  }
+
+  function actionBtns(t) {
+    var h = '';
+    if (t.state === 'active' || t.state === 'waiting') {
+      h += '<button class="btn sm" data-act="pause" data-id="' + t.id + '">暂停</button>';
+    } else if (t.state === 'paused' || t.state === 'error') {
+      h += '<button class="btn sm primary" data-act="resume" data-id="' + t.id + '">继续</button>';
+    }
+    if (t.state === 'done') {
+      if (t.playable) {
+        h += '<button class="btn sm primary" data-act="play" data-id="' + t.id + '">▶ 播放</button>';
+      } else if (t.file && !t.file.exists) {
+        h += '<button class="btn sm" disabled title="落盘文件已不在">文件已不在</button>';
+      }
+      if (t.media === 'video') {
+        h += '<button class="btn sm" data-act="library" data-id="' + t.id + '">在媒体库打开</button>';
+      }
+    }
+    h += '<button class="btn sm danger" data-act="delete" data-id="' + t.id + '">删除</button>';
+    return h;
+  }
+
+  function taskCard(t) {
+    var file = t.file && t.file.path
+      ? '<span class="src">' + esc(t.file.name || t.file.path) + (t.file.exists ? '' : '（文件已不在）') + '</span>'
+      : '<span class="src">' + esc(t.kind === 'magnet' ? (t.magnet || '').slice(0, 60) : t.url) + '</span>';
+    var err = t.state === 'error' && t.error ? '<div class="task-err">⚠ ' + esc(t.error) + '</div>' : '';
+    var note = '';
+    if (t.kind === 'magnet' && (t.state === 'waiting' || t.state === 'paused')) {
+      note = '<div class="task-note">本机 UDP/DHT 受限，磁力需要外网节点；直链下载不受影响。</div>';
+    } else if (t.error && t.state !== 'error') {
+      note = '<div class="task-note">' + esc(t.error) + '</div>';
+    }
+    return '<div class="task" data-id="' + t.id + '">' +
+      '<div class="task-h"><b>' + esc(t.name) + '</b>' +
+      '<span class="kind">' + (t.kind === 'magnet' ? '磁力' : '直链') + '</span>' +
+      '<span class="state ' + t.state + '">' + esc(t.stateName) + '</span>' +
+      '<span class="when">' + when(t.updatedAt) + '</span></div>' +
+      '<div class="task-m">' +
+      '<span class="num"><b>' + t.progress.toFixed(1) + '%</b></span>' +
+      '<div class="bar' + (t.state === 'active' ? '' : ' idle') + '"><i style="width:' + t.progress + '%"></i></div>' +
+      '<span class="num">' + (t.state === 'active' ? fmtSpeed(t.speed) : '—') + '</span>' +
+      (t.peers != null ? '<span class="num">' + t.peers + ' 节点</span>' : '') +
+      (t.conns != null ? '<span class="num">' + t.conns + ' 连接</span>' : '') +
+      '<span class="num">' + fmtEta(t.eta) + '</span>' +
+      '<span class="num">' + fmtBytes(t.done) + ' / ' + fmtBytes(t.total) + '</span>' +
+      '</div>' + err + note +
+      '<div class="task-f">' + file + actionBtns(t) + '</div>' +
+      '</div>';
+  }
+
+  function paint() {
+    renderFilters();
+    var list = $('#list');
+    var items = S.filter ? S.items.filter(function (t) { return t.state === S.filter; }) : S.items;
+    if (!items.length) {
+      list.className = '';
+      list.innerHTML = '<div class="empty">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>' +
+        (S.filter ? '<b>这个状态下没有任务</b><span>换个筛选看看</span>' : '<b>下载中心还空着</b><span>加一条直链，或粘一个磁力链接进来</span><button class="btn primary" id="emptyNew">加入下载</button>') +
+        '</div>';
+      var b = $('#emptyNew');
+      if (b) b.onclick = openAdd;
+      return;
+    }
+    list.className = 'grid';
+    list.innerHTML = items.map(taskCard).join('');
+    Array.prototype.forEach.call(list.querySelectorAll('[data-act]'), function (btn) {
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        var act = btn.getAttribute('data-act'), id = btn.getAttribute('data-id');
+        if (act === 'delete') return openDel(id);
+        if (act === 'play') { var t1 = findTask(id); if (t1) openPlayer(t1); return; }
+        if (act === 'library') { var t2 = findTask(id); if (t2) openLibrary(t2); return; }
+        api('/' + act, { id: id }).then(function (d) {
+          if (!d.ok) throw new Error(d.message || '操作失败');
+          toast(act === 'pause' ? '已暂停' : '已继续排队');
+          load();
+        }).catch(function (err) { toast(err.message, true); });
+      };
+    });
+  }
+
+  function load() {
+    api('/list').then(function (d) {
+      if (!d.ok) throw new Error(d.message || 'fail');
+      S.items = d.items || [];
+      S.totals = d.totals || null;
+      S.magnet = d.magnet || null;
+      S.dir = d.dir || '';
+      if (S.totals) {
+        $('#fTotal').textContent = S.totals.total;
+        $('#fActive').textContent = S.totals.active;
+        $('#fPaused').textContent = S.totals.paused;
+        $('#fSpeed').textContent = S.totals.active ? fmtSpeed(S.totals.speed) : '—';
+      }
+      $('#dirLabel').textContent = '落盘目录：' + S.dir;
+      $('#magnetNote').textContent = S.magnet ? '磁力：' + S.magnet.message : '';
+      paint();
+      $('#updated').textContent = '更新于 ' + new Date().toTimeString().slice(0, 8);
+    }).catch(function (e) {
+      $('#list').className = '';
+      $('#list').innerHTML = '<div class="empty"><b>任务没读出来</b><span>' + esc(e.message || e) + '</span></div>';
+    });
+  }
+
+  function openAdd() {
+    $('#nUrl').value = ''; $('#nName').value = ''; $('#nMagnet').value = '';
+    $('#modal').classList.add('on'); $('#modal').setAttribute('aria-hidden', 'false');
+    setTimeout(function () { $('#nUrl').focus(); }, 60);
+  }
+  function closeAdd() {
+    $('#modal').classList.remove('on'); $('#modal').setAttribute('aria-hidden', 'true');
+  }
+
+  function saveAdd() {
+    var url = $('#nUrl').value.trim(), name = $('#nName').value.trim(), magnet = $('#nMagnet').value.trim();
+    if (!url && !magnet) { toast('给一个直链或磁力链接', true); return; }
+    var payload = magnet ? { magnet: magnet } : { url: url, name: name };
+    $('#btnSave').disabled = true;
+    api('/add', payload).then(function (d) {
+      if (!d.ok) throw new Error(d.message || '加不进去');
+      closeAdd();
+      toast('已加入下载');
+      load();
+    }).catch(function (e) { toast(e.message, true); })
+      .finally(function () { $('#btnSave').disabled = false; });
+  }
+
+  function openDel(id) {
+    var t = null;
+    for (var i = 0; i < S.items.length; i++) if (S.items[i].id === id) t = S.items[i];
+    if (!t) return;
+    S.deleting = t;
+    $('#delName').textContent = t.name;
+    $('#delFile').checked = false;
+    $('#delModal').classList.add('on'); $('#delModal').setAttribute('aria-hidden', 'false');
+  }
+  function closeDel() {
+    S.deleting = null;
+    $('#delModal').classList.remove('on'); $('#delModal').setAttribute('aria-hidden', 'true');
+  }
+
+  function confirmDel() {
+    if (!S.deleting) return;
+    var id = S.deleting.id;
+    var removeFile = $('#delFile').checked;
+    api('/delete', { id: id, removeFile: removeFile }).then(function (d) {
+      if (!d.ok) throw new Error(d.message || '删除失败');
+      closeDel();
+      toast(removeFile ? '任务和文件都删了' : '只删了任务记录');
+      load();
+    }).catch(function (e) { toast(e.message, true); });
+  }
+
+  $('#btnNew').onclick = openAdd;
+  $('#btnClose').onclick = closeAdd;
+  $('#btnCancel').onclick = closeAdd;
+  $('#btnSave').onclick = saveAdd;
+  $('#delClose').onclick = closeDel;
+  $('#delCancel').onclick = closeDel;
+  $('#delConfirm').onclick = confirmDel;
+  $('#playerClose').onclick = closePlayer;
+  $('#modal').onclick = function (e) { if (e.target.id === 'modal') closeAdd(); };
+  $('#delModal').onclick = function (e) { if (e.target.id === 'delModal') closeDel(); };
+  $('#playerModal').onclick = function (e) { if (e.target.id === 'playerModal') closePlayer(); };
+  $('#btnClear').onclick = function () {
+    api('/clear-done').then(function (d) {
+      if (!d.ok) throw new Error(d.message || '失败');
+      toast(d.removed ? '已清空 ' + d.removed + ' 条已完成记录' : '没有已完成的任务');
+      load();
+    }).catch(function (e) { toast(e.message, true); });
+  };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeAdd(); closeDel(); closePlayer(); }
+  });
+
+  load();
+  setInterval(load, 2500);
+})();
+</script>
+</body>
+</html>

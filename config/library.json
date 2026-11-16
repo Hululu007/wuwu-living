@@ -1,0 +1,7 @@
+{
+  "roots": ["~/Movies", "~/Downloads/五五下载", "~/Downloads"],
+  "extensions": [".mp4", ".mkv", ".mov", ".avi", ".m4v", ".ts", ".webm", ".flv", ".rmvb"],
+  "concurrency": 4,
+  "ttlDays": 30,
+  "maxDepth": 4
+}

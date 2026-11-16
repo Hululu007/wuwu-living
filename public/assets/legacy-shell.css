@@ -1,0 +1,183 @@
+/* ─────────────────────────────────────────────────────────────
+   五五客厅 · 旧前端统一外壳（magnet / music / vod）
+   只挂外壳，不动人家内部：统一顶栏、返回客厅、页脚、字体与滚动条。
+   全部类名以 ww- 开头，避免和三个工程的原有类名撞车。
+   ───────────────────────────────────────────────────────────── */
+
+:root{
+  /* 与 room.css 同一套 token，旧前端也吃同一份 */
+  --ww-bg:#0b0c0e;
+  --ww-panel:#12141a;
+  --ww-ink:#efe9df;
+  --ww-muted:#918c83;
+  --ww-faint:#5e5b55;
+  --ww-line:rgba(239,233,223,.12);
+  --ww-line2:rgba(239,233,223,.055);
+  --ww-sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --ww-serif:"Songti SC","STSong","Noto Serif SC",serif;
+  --ww-r-sm:8px;
+  --ww-r-md:12px;
+  --ww-r-lg:18px;
+  --ww-pill:999px;
+  --ww-sh-1:0 2px 8px rgba(0,0,0,.28);
+  --ww-sh-2:0 10px 28px rgba(0,0,0,.36);
+  --ww-sh-3:0 26px 68px rgba(0,0,0,.52);
+  --ww-bar-h:46px;
+  --ww-ease:cubic-bezier(.2,.8,.2,1);
+  /* 每间房的主色由注入时带的 data-room 决定 */
+  --ww-a:#7ea6e0;
+  --ww-soft:rgba(126,166,224,.14);
+  --ww-edge:rgba(126,166,224,.34);
+}
+
+/* ── 顶栏 ────────────────────────────────────────────────── */
+.ww-bar{
+  position:fixed;left:0;right:0;top:0;z-index:9000;
+  height:var(--ww-bar-h);display:flex;align-items:center;gap:10px;
+  padding:0 14px;
+  background:rgba(11,12,14,.72);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  backdrop-filter:blur(18px) saturate(140%);
+  border-bottom:1px solid var(--ww-line2);
+  font-family:var(--ww-sans);
+  color:var(--ww-ink);
+  font-size:13px;
+  letter-spacing:.01em;
+}
+.ww-bar a,.ww-bar button{
+  all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  font:inherit;color:var(--ww-ink);
+}
+.ww-bar .ww-home{
+  display:inline-flex;align-items:center;gap:5px;padding:6px 10px;
+  border:1px solid rgba(255,255,255,.06);border-radius:8px;
+  font-size:12px;letter-spacing:.1em;color:var(--ww-muted,#918c83);
+  text-decoration:none;line-height:1;white-space:nowrap;flex:none;
+  transition:color .15s var(--ww-ease),background .15s var(--ww-ease),border-color .15s var(--ww-ease);
+}
+.ww-bar .ww-home:hover{color:var(--ww-ink,#efe9df);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+.ww-bar .ww-home svg{width:14px;height:14px;opacity:.8}
+.ww-bar .ww-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--ww-a);
+  box-shadow:0 0 0 3px var(--ww-soft),0 0 12px var(--ww-edge);
+  flex:0 0 auto;
+}
+.ww-bar .ww-name{
+  font-family:var(--ww-serif);font-size:15px;letter-spacing:.06em;
+}
+.ww-bar .ww-sub{color:var(--ww-faint);font-size:11.5px;letter-spacing:.04em}
+.ww-bar .ww-grow{flex:1}
+.ww-bar .ww-acts{display:flex;align-items:center;gap:8px}
+.ww-bar .ww-acts .ww-pill{
+  height:26px;padding:0 10px;border-radius:var(--ww-pill);
+  border:1px solid var(--ww-line);color:var(--ww-muted);
+  font-size:11.5px;transition:.18s var(--ww-ease);
+}
+.ww-bar .ww-acts .ww-pill:hover{color:var(--ww-ink);border-color:rgba(239,233,223,.26)}
+
+/* 页面给顶栏让位（三个工程的内部结构不同，具体偏移在下方按房补齐） */
+body.ww-shell{padding-top:var(--ww-bar-h)!important}
+
+/* ── 页脚 ────────────────────────────────────────────────── */
+.ww-foot{
+  margin:26px 0 0;padding:16px 14px 26px;
+  border-top:1px solid var(--ww-line2);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  font-family:var(--ww-sans);font-size:11.5px;color:var(--ww-faint);
+  letter-spacing:.03em;
+}
+.ww-foot a{color:var(--ww-muted);text-decoration:none;border-bottom:1px solid var(--ww-line2)}
+.ww-foot a:hover{color:var(--ww-ink)}
+.ww-foot .ww-grow{flex:1}
+
+/* ── 与新房对齐的基础观感（谨慎：只碰容器级的通用元素） ── */
+body.ww-shell{
+  font-family:var(--ww-sans);
+  -webkit-font-smoothing:antialiased;
+  background:var(--ww-bg);
+  color:var(--ww-ink);
+}
+/* 输入 / 选择 / 文本域：圆角与描边对齐新房（按钮保留各家自己的胶囊/圆形样式） */
+body.ww-shell input,
+body.ww-shell select,
+body.ww-shell textarea{
+  border-radius:var(--ww-r-sm);
+}
+body.ww-shell ::selection{background:var(--ww-soft);color:var(--ww-ink)}
+body.ww-shell *::-webkit-scrollbar{width:9px;height:9px}
+body.ww-shell *::-webkit-scrollbar-track{background:transparent}
+body.ww-shell *::-webkit-scrollbar-thumb{
+  background:rgba(239,233,223,.14);border-radius:var(--ww-pill);
+  border:2px solid transparent;background-clip:padding-box;
+}
+body.ww-shell *::-webkit-scrollbar-thumb:hover{background:rgba(239,233,223,.26);background-clip:padding-box}
+body.ww-shell :focus-visible{outline:2px solid var(--ww-edge);outline-offset:2px}
+body.ww-shell input,body.ww-shell select,body.ww-shell textarea,body.ww-shell button{font-family:var(--ww-sans)}
+
+/* ── 空态 / 加载态（旧前端如果没有自己的就用这两块） ─────── */
+.ww-empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  padding:48px 20px;color:var(--ww-faint);text-align:center;font-size:13px;
+}
+.ww-empty b{font-family:var(--ww-serif);font-size:17px;color:var(--ww-muted);font-weight:400;letter-spacing:.06em}
+.ww-empty span{font-size:12px;line-height:1.7}
+
+.ww-load{display:inline-flex;align-items:center;gap:5px}
+.ww-load i{
+  width:5px;height:5px;border-radius:50%;background:var(--ww-muted);
+  animation:ww-bounce 1.1s infinite var(--ww-ease);
+}
+.ww-load i:nth-child(2){animation-delay:.16s}
+.ww-load i:nth-child(3){animation-delay:.32s}
+@keyframes ww-bounce{0%,80%,100%{opacity:.28;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+
+/* ── 三个旧房各自要让位的地方（按实测骨架补齐） ─────────────── */
+/*
+ * 实测结论（2026-11-16，直连上游 7788 / 8811 / 8900 抓 HTML 核对）：
+ *  · magnet：body > .wrap > header，头栏是普通文档流（非 fixed/sticky），
+ *    没有 #top。默认 body padding-top 让位即可，无需额外偏移。
+ *  · music ：body > .appbar（position:sticky; top:0; height:64px），
+ *    另有无滚动时才出现的 .dock / .tabbar / #player（fixed 底部/全屏，不占顶部）。
+ *    顶栏把 sticky 头栏的停靠位置往下压一个 ww-bar 高度。
+ *  · vod   ：html,body{height:100%;overflow:hidden}；#top 是 position:relative 高 58px，
+ *    #main{height:calc(100% - 58px)}。body 已带 box-sizing:border-box，padding-top 计入
+ *    100% 高度；#main 与页脚把让出的高度扣掉，避免内容被裁。
+ */
+
+/* 搜磁力：文档流头栏，默认 padding-top 让位 */
+body[data-room="magnet"].ww-shell{padding-top:var(--ww-bar-h)!important}
+/* 磁力页的头栏实测是 position:fixed（不是文档流），要显式压到顶栏下方，否则被顶栏盖住 */
+body[data-room="magnet"].ww-shell .wrap > header{
+  top:var(--ww-bar-h)!important;
+  background:#0b0c0e;
+}
+body[data-room="magnet"].ww-shell .wrap{padding-top:8px}
+
+/* 听音乐：sticky 头栏停靠到我们的顶栏下方 */
+body[data-room="music"].ww-shell{padding-top:var(--ww-bar-h)!important}
+body[data-room="music"].ww-shell .appbar{top:var(--ww-bar-h)}
+
+/* 看视频：全屏固定布局，#main 扣掉顶栏 + 页脚高度；页脚不挤占播放器 */
+body[data-room="vod"].ww-shell{padding-top:var(--ww-bar-h)!important}
+body[data-room="vod"].ww-shell #main{
+  height:calc(100% - 58px - var(--ww-bar-h) - 42px)!important;
+}
+body[data-room="vod"].ww-shell .ww-foot{
+  margin:0;padding:10px 14px;border-top:1px solid var(--ww-line2);
+}
+
+/* 每房主色（applyShell 也会在 body 上内联一份，这里兜底） */
+body[data-room="magnet"]{--ww-a:#7ea6e0;--ww-soft:rgba(126,166,224,.14);--ww-edge:rgba(126,166,224,.34)}
+body[data-room="music"] {--ww-a:#dd7768;--ww-soft:rgba(221,119,104,.14);--ww-edge:rgba(221,119,104,.34)}
+body[data-room="vod"]   {--ww-a:#a996dd;--ww-soft:rgba(169,150,221,.14);--ww-edge:rgba(169,150,221,.34)}
+
+/* 窄屏收紧 */
+@media (max-width:620px){
+  .ww-bar{padding:0 10px;gap:8px}
+  .ww-bar .ww-sub{display:none}
+  .ww-bar .ww-acts .ww-pill.opt{display:none}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .ww-load i{animation:none;opacity:.7}
+}

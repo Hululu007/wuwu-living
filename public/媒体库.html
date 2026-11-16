@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>媒体库 · 五五客厅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='28' font-family='serif' fill='%239cac69' text-anchor='middle'%3E影%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/room.css">
+<style>
+  /* ── 海报墙 ── */
+  .poster-card{display:flex;flex-direction:column;cursor:pointer;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.042),rgba(255,255,255,.012));transition:.18s}
+  .poster-card:hover{border-color:var(--edge);transform:translateY(-2px)}
+  .poster{position:relative;aspect-ratio:2/3;background:var(--soft);overflow:hidden}
+  .poster img{width:100%;height:100%;object-fit:cover}
+  .poster .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:46px;color:var(--a)}
+  .poster .rate{position:absolute;top:8px;left:8px;background:rgba(11,12,14,.8);color:var(--a);font-size:11px;padding:2px 7px;border-radius:6px;letter-spacing:.04em}
+  .poster .ep{position:absolute;bottom:8px;right:8px;background:rgba(11,12,14,.8);color:var(--muted);font-size:10px;padding:2px 7px;border-radius:6px}
+  .poster-info{padding:11px 12px 12px;display:flex;flex-direction:column;gap:4px}
+  .poster-info .t{font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .poster-info .s{font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* ── 继续观看横条 ── */
+  .continue{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
+  .cont-item{display:flex;gap:11px;min-width:310px;max-width:310px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:rgba(255,255,255,.025);transition:.16s}
+  .cont-item:hover{border-color:var(--edge);background:rgba(255,255,255,.05)}
+  .cont-thumb{width:46px;height:66px;border-radius:6px;background:var(--soft);flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:var(--a);font-family:var(--serif);font-size:20px}
+  .cont-thumb img{width:100%;height:100%;object-fit:cover;border-radius:6px}
+  .cont-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+  .cont-body .t{font-size:12.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cont-body .s{font-size:10.5px;color:var(--faint)}
+
+  /* ── 详情弹层 ── */
+  .detail-body{display:flex;gap:18px}
+  .detail-poster{width:152px;flex:0 0 auto;aspect-ratio:2/3;border-radius:10px;overflow:hidden;background:var(--soft);display:flex;align-items:center;justify-content:center;color:var(--a);font-family:var(--serif);font-size:42px}
+  .detail-poster img{width:100%;height:100%;object-fit:cover}
+  .detail-meta{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .meta-row .big-rate{font-family:var(--serif);font-size:20px;color:var(--a)}
+  .intro{font-size:12.5px;line-height:1.85;color:var(--muted)}
+  .files{display:flex;flex-direction:column;gap:8px}
+  .file-row{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line2);border-radius:9px}
+  .file-row.playing{border-color:var(--edge);background:var(--soft)}
+  .file-row .info{flex:1;min-width:0}
+  .file-row .name{font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .file-row .sub{font-size:10.5px;color:var(--faint);margin-top:2px}
+  .file-row .acts{display:flex;align-items:center;gap:7px;flex:0 0 auto}
+
+  /* ── 内嵌播放器 ── */
+  .player{margin-top:16px}
+  .player video{width:100%;max-height:46vh;background:#000;border-radius:10px;display:block}
+  .player-bar{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .player-bar span{font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  @media (max-width:620px){
+    .detail-body{flex-direction:column}
+    .detail-poster{width:110px}
+    .cont-item{min-width:260px;max-width:260px}
+  }
+</style>
+</head>
+<body data-room="library">
+<div class="grain" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="top">
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <div class="titlebar">
+      <h1><i></i>媒体库</h1>
+      <span class="sub">本地影片聚合 · 豆瓣刮削 · 断点续播</span>
+    </div>
+    <div class="top-act">
+      <button class="btn primary" id="btnScan" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+        重新扫描
+      </button>
+    </div>
+  </header>
+
+  <section class="lede">
+    <p>Movies 与下载目录里的影片按片名归好；能匹配豆瓣的补上海报、评分和简介，没匹配上的也照实列出本地信息。看到哪一集记在本地，下次接着播。</p>
+    <div class="figs">
+      <div class="fig"><b id="fTotal">—</b><span>个文件</span></div>
+      <div class="fig"><b id="fMovies">—</b><span>电影</span></div>
+      <div class="fig"><b id="fSeries">—</b><span>剧集</span></div>
+      <div class="fig"><b id="fScraped">—</b><span>已匹配豆瓣</span></div>
+    </div>
+  </section>
+
+  <section class="sec" id="continueSec" hidden>
+    <div class="sec-h">
+      <h2>继续观看</h2>
+      <span class="count" id="continueCount"></span>
+    </div>
+    <div class="continue" id="continueRow"></div>
+  </section>
+
+  <div class="toolbar">
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+      <input class="input" id="q" type="search" placeholder="搜片名、年份、类型…" autocomplete="off">
+    </label>
+    <span class="stat-inline" id="scanInfo"></span>
+  </div>
+
+  <div id="list" class="grid auto"></div>
+
+  <footer class="foot">
+    <span>数据落在 runtime/library.json · 海报缓存 runtime/library/posters · 重启客厅也在</span>
+    <span id="updated">—</span>
+  </footer>
+</div>
+
+<div class="modal" id="modal" aria-hidden="true">
+  <div class="sheet detail">
+    <div class="sheet-h">
+      <h3 id="dTitle">详情</h3>
+      <button class="btn ghost icon x" id="btnClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="detail-body">
+      <div class="detail-poster" id="dPoster">影</div>
+      <div class="detail-meta">
+        <div id="dMeta"></div>
+        <div class="files" id="dFiles"></div>
+      </div>
+    </div>
+    <div class="player" id="player" hidden>
+      <video id="video" controls playsinline preload="metadata"></video>
+      <div class="player-bar">
+        <span id="playerName"></span>
+        <button class="btn sm ghost" id="btnOpenSys" type="button">用系统播放器打开</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var S = { items: [], q: '', detail: null, current: null, reportTimer: null, scanPoll: null };
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+
+  var TYPE_NAME = { movie: '电影', tv: '剧集', drama: '剧集' };
+
+  function toast(msg, err) {
+    var t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.className = 'toast'; }, 2400);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function titleOf(g) { return (g.scrape && g.scrape.title) || g.localTitle || '未命名'; }
+  function yearOf(g) { return (g.scrape && g.scrape.year) || g.year || ''; }
+  function typeOf(g) {
+    var t = (g.scrape && g.scrape.type) || g.kind;
+    return TYPE_NAME[t] || (g.kind === 'series' ? '剧集' : '电影');
+  }
+
+  /* ── 列表加载 ── */
+
+  function load() {
+    fetch('/api/library/list', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || '读不出来');
+        S.items = (d.movies || []).concat(d.series || []);
+        $('#fTotal').textContent = d.totalFiles;
+        $('#fMovies').textContent = (d.movies || []).length;
+        $('#fSeries').textContent = (d.series || []).length;
+        $('#fScraped').textContent = (d.movies || []).concat(d.series || []).filter(function (g) { return g.scrape; }).length;
+        var sc = d.scan || {};
+        $('#scanInfo').textContent = sc.running
+          ? (sc.message || '正在扫描…') + '（已找到 ' + sc.found + ' 个文件）'
+          : (sc.message || '已扫描') + ' · 已匹配 ' + sc.scraped + ' 部';
+        $('#updated').textContent = d.updatedAt ? '更新于 ' + new Date(d.updatedAt).toTimeString().slice(0, 8) : '—';
+        paintContinue();
+        paint();
+      })
+      .catch(function (e) {
+        $('#list').innerHTML = '<div class="empty"><b>媒体库没读出来</b><span>' + esc(e.message || e) + '</span></div>';
+      });
+  }
+
+  function paintContinue() {
+    var watched = [];
+    S.items.forEach(function (g) {
+      (g.files || []).forEach(function (f) {
+        if (f.progress) watched.push({ g: g, f: f, progress: f.progress });
+      });
+    });
+    watched.sort(function (a, b) { return (b.progress.updatedAt || 0) - (a.progress.updatedAt || 0); });
+    watched = watched.slice(0, 5);
+    $('#continueSec').hidden = !watched.length;
+    if (!watched.length) return;
+    $('#continueCount').textContent = watched.length + ' 部在看';
+    $('#continueRow').innerHTML = watched.map(function (w, i) {
+      var g = w.g, f = w.f;
+      var ratio = f.progress.duration > 0 ? Math.min(1, f.progress.seconds / f.progress.duration) : 0;
+      var thumb = g.posterUrl
+        ? '<img src="' + esc(g.posterUrl) + '" alt="">'
+        : '<span>' + esc((titleOf(g) || '影').slice(0, 1)) + '</span>';
+      var ep = f.episode ? '第 ' + f.episode + ' 集' : '继续观看';
+      return '<div class="cont-item" data-id="' + esc(g.id) + '" data-i="' + i + '">' +
+        '<div class="cont-thumb">' + thumb + '</div>' +
+        '<div class="cont-body"><div class="t">' + esc(titleOf(g)) + '</div>' +
+        '<div class="s">' + esc(ep) + ' · 看到 ' + Math.round(ratio * 100) + '%</div>' +
+        '<div class="bar thin"><i style="width:' + Math.round(ratio * 100) + '%"></i></div></div>' +
+        '</div>';
+    }).join('');
+    Array.prototype.forEach.call($('#continueRow').children, function (c) {
+      c.onclick = function () { openDetail(c.getAttribute('data-id')); };
+    });
+  }
+
+  function match(g) {
+    if (!S.q) return true;
+    var q = S.q.toLowerCase();
+    var hay = [titleOf(g), g.localTitle, yearOf(g), typeOf(g), (g.scrape && g.scrape.subTitle) || ''].join(' ').toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }
+
+  function paint() {
+    var list = $('#list');
+    var shown = S.items.filter(match);
+    if (!shown.length) {
+      list.className = '';
+      list.innerHTML = '<div class="empty">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>' +
+        (S.q ? '<b>这个条件下没有片子</b><span>换个词，或者清空搜索</span>'
+          : '<b>媒体库还空着</b><span>把影片放进配置的目录，点「重新扫描」就会出现海报墙</span>') +
+        '</div>';
+      return;
+    }
+    list.className = 'grid auto';
+    list.innerHTML = shown.map(function (g) {
+      var rate = g.scrape && g.scrape.rate ? g.scrape.rate : '';
+      var img = g.posterUrl
+        ? '<img src="' + esc(g.posterUrl) + '" alt="" loading="lazy">'
+        : '<div class="ph">' + esc((titleOf(g) || '影').slice(0, 1)) + '</div>';
+      var epBadge = g.kind === 'series' ? '<span class="ep">' + g.fileCount + ' 集</span>' : '';
+      var meta = [yearOf(g), typeOf(g)].filter(Boolean).join(' · ');
+      return '<div class="poster-card" data-id="' + esc(g.id) + '">' +
+        '<div class="poster">' + img +
+        (rate ? '<span class="rate">★ ' + esc(rate) + '</span>' : '') + epBadge +
+        '</div>' +
+        '<div class="poster-info"><div class="t">' + esc(titleOf(g)) + '</div>' +
+        '<div class="s">' + esc(meta || '本地文件') + '</div></div>' +
+        '</div>';
+    }).join('');
+    Array.prototype.forEach.call(list.children, function (c) {
+      c.onclick = function () { openDetail(c.getAttribute('data-id')); };
+    });
+  }
+
+  /* ── 详情 ── */
+
+  function openDetail(id) {
+    fetch('/api/library/detail?id=' + encodeURIComponent(id), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || '没有这部片子');
+        S.detail = d.item;
+        renderDetail(d.item);
+        $('#modal').classList.add('on');
+        $('#modal').setAttribute('aria-hidden', 'false');
+      })
+      .catch(function (e) { toast(e.message, true); });
+  }
+
+  function renderDetail(g) {
+    $('#dTitle').textContent = titleOf(g);
+    var sc = g.scrape;
+
+    // 海报
+    var $p = $('#dPoster');
+    if (g.posterUrl) {
+      $p.innerHTML = '<img src="' + esc(g.posterUrl) + '" alt="">';
+    } else {
+      $p.textContent = (titleOf(g) || '影').slice(0, 1);
+    }
+
+    // 元信息
+    var chips = [];
+    if (yearOf(g)) chips.push('<span class="chip">' + esc(yearOf(g)) + '</span>');
+    chips.push('<span class="chip">' + esc(typeOf(g)) + '</span>');
+    if (sc && sc.types && sc.types.length) sc.types.forEach(function (t) { chips.push('<span class="chip">' + esc(t) + '</span>'); });
+    if (sc && sc.region) chips.push('<span class="chip">' + esc(sc.region) + '</span>');
+    if (sc && sc.duration) chips.push('<span class="chip">' + esc(sc.duration) + '</span>');
+    if (sc && sc.episodesCount) chips.push('<span class="chip">共 ' + esc(sc.episodesCount) + ' 集</span>');
+
+    var rateHtml = sc && sc.rate
+      ? '<span class="big-rate">★ ' + esc(sc.rate) + '</span>' : '';
+    var intro = sc && sc.intro
+      ? '<p class="intro">' + esc(sc.intro) + '</p>'
+      : '<p class="intro">未匹配到豆瓣条目 · 以下为本地文件信息。</p>';
+    if (sc && sc.subTitle) chips.push('<span class="chip">' + esc(sc.subTitle) + '</span>');
+
+    $('#dMeta').innerHTML =
+      '<div class="meta-row">' + rateHtml + '</div>' +
+      '<div class="meta-row">' + chips.join('') + '</div>' +
+      intro;
+
+    // 文件列表
+    var rows = (g.files || []).map(function (f, i) {
+      var ep = f.episode ? 'S' + String(f.season || 1).padStart(2, '0') + 'E' + String(f.episode).padStart(2, '0') : '文件 ' + (i + 1);
+      var sub = [f.sizeText, f.durationText, (f.width && f.height) ? f.width + '×' + f.height : ''].filter(Boolean).join(' · ');
+      var prog = f.progress
+        ? '<span class="chip on">已看到 ' + Math.round(f.progress.seconds) + ' 秒</span>' : '';
+      return '<div class="file-row" data-i="' + i + '">' +
+        '<div class="info"><div class="name">' + esc(f.name) + '</div><div class="sub">' + esc(ep) + ' · ' + esc(sub) + '</div></div>' +
+        '<div class="acts">' + prog +
+        '<button class="btn sm primary" data-play="' + i + '" type="button">播放</button>' +
+        '<button class="btn sm ghost" data-open="' + i + '" type="button">系统打开</button>' +
+        '</div></div>';
+    }).join('');
+    $('#dFiles').innerHTML = rows;
+
+    Array.prototype.forEach.call($('#dFiles').children, function (row) {
+      var i = Number(row.getAttribute('data-i'));
+      var f = g.files[i];
+      row.querySelector('[data-play]').onclick = function () { playFile(g, f, row); };
+      row.querySelector('[data-open]').onclick = function () { openSystem(f); };
+    });
+
+    stopReport();
+    $('#player').hidden = true;
+    $('#video').removeAttribute('src');
+  }
+
+  /* ── 播放 / 进度 ── */
+
+  function playFile(g, f, row) {
+    stopReport();
+    S.current = { g: g, f: f };
+    var v = $('#video');
+    v.src = '/api/library/media?path=' + encodeURIComponent(f.path);
+    if (f.progress && f.progress.seconds) v.currentTime = Math.min(f.progress.seconds, f.duration || 0);
+    $('#player').hidden = false;
+    $('#playerName').textContent = f.name;
+    Array.prototype.forEach.call($('#dFiles').children, function (r) { r.classList.remove('playing'); });
+    if (row) row.classList.add('playing');
+    v.play().catch(function () { toast('浏览器没能直接播放，可点「系统播放器打开」', true); });
+
+    S.reportTimer = setInterval(function () {
+      if (v.paused || v.ended || !S.current) return;
+      fetch('/api/library/progress', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          groupId: g.id, path: f.path,
+          seconds: v.currentTime, duration: v.duration || f.duration || 0,
+          title: titleOf(g), episode: f.episode == null ? null : String(f.episode),
+        }),
+      }).catch(function () {});
+    }, 5000);
+  }
+
+  function stopReport() {
+    if (S.reportTimer) { clearInterval(S.reportTimer); S.reportTimer = null; }
+  }
+
+  function openSystem(f) {
+    fetch('/api/library/open?path=' + encodeURIComponent(f.path))
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (!d.ok) throw new Error(d.message || '打不开'); toast('已交给系统播放器'); })
+      .catch(function (e) { toast(e.message, true); });
+  }
+
+  function close() {
+    var v = $('#video');
+    stopReport();
+    if (S.current) {
+      var g = S.current.g, f = S.current.f;
+      if (!v.paused && v.currentTime > 0) {
+        fetch('/api/library/progress', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ groupId: g.id, path: f.path, seconds: v.currentTime, duration: v.duration || f.duration || 0, title: titleOf(g), episode: f.episode == null ? null : String(f.episode) }),
+        }).catch(function () {});
+      }
+    }
+    v.pause();
+    v.removeAttribute('src');
+    S.current = null;
+    $('#player').hidden = true;
+    $('#modal').classList.remove('on');
+    $('#modal').setAttribute('aria-hidden', 'true');
+    S.detail = null;
+    load();
+  }
+
+  /* ── 扫描 ── */
+
+  function pollStatus() {
+    fetch('/api/library/scan-status', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var sc = d.scan || {};
+        $('#scanInfo').textContent = sc.running
+          ? (sc.message || '正在扫描…') + '（已找到 ' + sc.found + ' 个文件）'
+          : (sc.message || '已扫描') + ' · 已匹配 ' + sc.scraped + ' 部';
+        if (sc.running) {
+          S.scanPoll = setTimeout(pollStatus, 1800);
+        } else {
+          load();
+        }
+      })
+      .catch(function () { S.scanPoll = setTimeout(pollStatus, 3000); });
+  }
+
+  $('#btnScan').onclick = function () {
+    $('#btnScan').disabled = true;
+    fetch('/api/library/scan', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || '触发失败');
+        toast('开始扫描目录…');
+        pollStatus();
+      })
+      .catch(function (e) { toast(e.message, true); })
+      .finally(function () { setTimeout(function () { $('#btnScan').disabled = false; }, 1200); });
+  };
+
+  /* ── 事件 ── */
+
+  $('#btnClose').onclick = close;
+  $('#modal').onclick = function (e) { if (e.target.id === 'modal') close(); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && $('#modal').classList.contains('on')) close();
+  });
+
+  var deb;
+  $('#q').oninput = function () {
+    clearTimeout(deb);
+    var v = this.value;
+    deb = setTimeout(function () { S.q = v.trim(); paint(); }, 220);
+  };
+
+  /* ── 深链定位：/library/?focus=<绝对路径>，未索引先入库再弹详情 ── */
+  function applyFocus() {
+    var focus = new URLSearchParams(location.search).get('focus');
+    if (!focus) return;
+    fetch('/api/library/ensure?path=' + encodeURIComponent(focus), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || '定位失败');
+        load();
+        openDetail(d.id);
+      })
+      .catch(function (e) { toast(e.message, true); });
+  }
+
+  load();
+  applyFocus();
+  setInterval(function () {
+    if (!S.scanPoll) load();
+  }, 30000);
+})();
+</script>
+</body>
+</html>

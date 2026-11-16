@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>相册 · 五五客厅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='28' font-family='serif' fill='%237fb4c4' text-anchor='middle'%3E相%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/room.css">
+<style>
+  .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .month{margin-top:26px}
+  .month-h{display:flex;align-items:baseline;gap:9px;margin:0 0 11px}
+  .month-h h2{margin:0;font-size:14px;font-weight:600;letter-spacing:.06em;color:var(--ink);white-space:nowrap}
+  .month-h .n{font-size:11px;color:var(--faint);white-space:nowrap}
+  .ph{
+    position:relative;display:block;cursor:pointer;border-radius:10px;overflow:hidden;
+    border:1px solid var(--line);background:rgba(255,255,255,.03);transition:.18s;
+  }
+  .ph:hover{border-color:var(--edge);transform:translateY(-1px)}
+  .ph img{width:100%;height:132px;object-fit:cover;background:#0e1013}
+  .ph .cap{
+    position:absolute;left:0;right:0;bottom:0;padding:16px 8px 6px;font-size:10px;color:var(--ink);
+    background:linear-gradient(180deg,transparent,rgba(0,0,0,.72));
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .ph .kind{
+    position:absolute;top:7px;left:7px;font-size:9px;letter-spacing:.08em;color:var(--a);
+    background:rgba(11,12,14,.62);border:1px solid var(--edge);border-radius:5px;padding:1px 6px;
+  }
+  .ph .loading-thumb{height:132px;display:flex;align-items:center;justify-content:center}
+  .ph .play{
+    position:absolute;inset:0;margin:auto;width:30px;height:30px;border-radius:50%;z-index:2;
+    display:flex;align-items:center;justify-content:center;background:rgba(11,12,14,.55);
+    color:#fff;font-size:12px;pointer-events:none;
+  }
+  .vfall{
+    height:132px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    padding:10px 12px;background:linear-gradient(160deg,#171a1f,#0e1013);color:var(--muted);
+  }
+  .vfall .play{position:static;margin:0}
+  .vfall .vfn{font-size:11px;color:var(--ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vfall .vdur{font-size:10px;color:var(--faint)}
+  .toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+  .chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .stat-inline{font-size:11px;color:var(--faint);letter-spacing:.04em}
+  .notice{
+    margin:10px 0 0;padding:9px 12px;border:1px dashed var(--line);border-radius:9px;
+    font-size:11.5px;color:var(--muted);line-height:1.8;
+  }
+  .notice.warn{border-color:rgba(214,160,94,.35);color:#d8c49e}
+  .progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .progress .bar{flex:1;min-width:160px;max-width:320px}
+  .progress .msg{font-size:11px;color:var(--faint)}
+
+  /* 大图弹层 */
+  .lightbox{position:fixed;inset:0;z-index:320;display:flex;flex-direction:column;background:rgba(5,6,8,.9)}
+  .lightbox[hidden]{display:none!important}
+  .lightbox .stage{position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .lightbox img.full,.lightbox video.full{max-width:92vw;max-height:76vh;object-fit:contain;border-radius:6px;box-shadow:0 30px 80px -30px rgba(0,0,0,.9);background:#000}
+  .lbtn{
+    position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;border:1px solid var(--line);
+    background:rgba(18,20,24,.72);color:var(--ink);transition:.16s;z-index:3;
+  }
+  .lbtn:hover{border-color:var(--edge);background:var(--soft)}
+  .lbtn.prev{left:18px}.lbtn.next{right:18px}
+  .lbtn svg{width:17px;height:17px}
+  .lclose{position:absolute;top:16px;right:18px;z-index:3}
+  .lmeta{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 22px;
+    border-top:1px solid var(--line2);font-size:11.5px;color:var(--muted);
+  }
+  .lmeta .name{color:var(--ink);font-weight:600;font-size:13px;max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lmeta .spacer{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .ldir{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--faint)}
+
+  /* 投屏弹层 */
+  .dlna-devices{display:flex;flex-direction:column;gap:9px;margin:12px 0}
+  .dlna-dev{
+    display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line);
+    border-radius:9px;cursor:pointer;transition:.16s;
+  }
+  .dlna-dev.on{border-color:var(--edge);background:var(--soft)}
+  .dlna-dev .nm{font-size:13px;color:var(--ink)}
+  .dlna-dev .loc{font-size:10px;color:var(--faint);margin-top:2px;word-break:break-all}
+  .dlna-empty{padding:18px 12px;border:1px dashed var(--line);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.9;text-align:center}
+  .linkrow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .linkrow code{flex:1;min-width:180px;font-size:10.5px;color:var(--faint);word-break:break-all;background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:7px;padding:8px 10px}
+  @media (max-width:620px){.ph img{height:104px}.wall{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}}
+</style>
+</head>
+<body data-room="photos">
+<div class="grain" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="top">
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <div class="titlebar">
+      <h1><i></i>相册</h1>
+      <span class="sub">下载、桌面、图片目录里的相片，按年月排开</span>
+    </div>
+    <div class="top-act">
+      <button class="btn" id="btnScan" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+        重新扫描
+      </button>
+      <button class="btn primary" id="btnCast" type="button" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1.4"/></svg>
+        投屏到电视
+      </button>
+    </div>
+  </header>
+
+  <section class="lede">
+    <p>只读取本地目录，不改动原始文件；缩略图单独存在 runtime/photos/。<br>拍摄时间优先取 EXIF / 影片元数据，取不到就用文件修改时间。</p>
+    <div class="figs">
+      <div class="fig"><b id="fTotal">—</b><span>个文件</span></div>
+      <div class="fig"><b id="fMonths">—</b><span>个月份</span></div>
+      <div class="fig"><b id="fThumbs">—</b><span>张缩略图</span></div>
+      <div class="fig"><b id="fLatest">—</b><span>最近拍摄</span></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <div class="chips" id="months"></div>
+    <span class="stat-inline" id="count"></span>
+  </div>
+
+  <div class="progress" id="progress" hidden>
+    <div class="bar thin"><i id="pbar"></i></div>
+    <span class="msg" id="pmsg">准备中…</span>
+  </div>
+
+  <div id="skippedNotice" class="notice" hidden></div>
+  <div id="lanNotice" class="notice warn" hidden></div>
+
+  <div id="wall"></div>
+  <div id="sentinel" style="height:1px"></div>
+  <div class="loading" id="loading" hidden><span class="spinner"></span>正在继续加载…</div>
+
+  <footer class="foot">
+    <span>数据落在 runtime/photos.json · 缩略图在 runtime/photos/thumbs/ · 重启客厅仍在</span>
+    <span id="updated">—</span>
+  </footer>
+</div>
+
+<!-- 大图 -->
+<div class="lightbox" id="lightbox" hidden>
+  <div class="stage" id="lbStage">
+    <button class="lbtn lclose" id="lbClose" type="button" aria-label="关闭">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+    </button>
+    <button class="lbtn prev" id="lbPrev" type="button" aria-label="上一张">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <img class="full" id="lbImg" alt="">
+    <video class="full" id="lbVideo" controls playsinline autoplay muted hidden></video>
+    <button class="lbtn next" id="lbNext" type="button" aria-label="下一张">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+  <div class="lmeta">
+    <span class="name" id="lbName">—</span>
+    <span id="lbDate">—</span>
+    <span id="lbSize">—</span>
+    <span id="lbDims"></span>
+    <span class="ldir" id="lbDir">—</span>
+    <span class="spacer">
+      <button class="btn sm ghost" id="lbCopy" type="button">复制直链</button>
+      <a class="btn sm ghost" id="lbDownload" download>下载原图</a>
+      <button class="btn sm primary" id="lbCast" type="button">投屏</button>
+    </span>
+  </div>
+</div>
+
+<!-- 投屏 -->
+<div class="modal" id="castModal" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h3>投屏到电视（DLNA）</h3>
+      <button class="btn ghost icon x" id="castClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div id="castStatus" class="notice" style="margin:0"></div>
+    <div class="toolbar" style="margin:12px 0 0">
+      <button class="btn" id="btnDiscover" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>
+        发现设备（3 秒）
+      </button>
+      <span class="stat-inline" id="castHint"></span>
+    </div>
+    <div class="dlna-devices" id="dlnaDevices"></div>
+    <div class="dlna-empty" id="dlnaEmpty" hidden>局域网里没有发现可用的投屏设备。<br>可以复制下面的直链，或直接下载原图。</div>
+    <div class="linkrow">
+      <code id="castLink">—</code>
+      <button class="btn sm" id="castCopy" type="button">复制直链</button>
+      <a class="btn sm ghost" id="castDownload" download>下载原图</a>
+    </div>
+    <div class="notice warn" id="castLan" style="margin-top:12px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn ghost" id="castCancel" type="button">关闭</button>
+      <button class="btn primary" id="btnDoCast" type="button" disabled>推送到选中设备</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var S = {
+    items: [], byId: {}, offset: 0, total: 0, months: [], month: '',
+    loading: false, done: false, selectedDevice: null, currentId: null, lan: null,
+  };
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+
+  function toast(msg, err) {
+    var t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.className = 'toast'; }, 2400);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' +
+      String(d.getMinutes()).padStart(2, '0');
+  }
+  function fmtSize(n) {
+    if (!n) return '—';
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  function fmtDur(sec) {
+    if (!sec || !Number.isFinite(sec)) return '';
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  /* ── 月份 chips ── */
+  function renderMonths() {
+    var el = $('#months');
+    var html = '<span class="chip btn-ish' + (S.month === '' ? ' on' : '') + '" data-m="">全部</span>';
+    S.months.forEach(function (m) {
+      html += '<span class="chip btn-ish' + (S.month === m.key ? ' on' : '') + '" data-m="' + m.key + '">' +
+        esc(m.label) + ' ' + m.count + '</span>';
+    });
+    el.innerHTML = html;
+    Array.prototype.forEach.call(el.children, function (c) {
+      c.onclick = function () { S.month = c.getAttribute('data-m'); resetWall(); loadMore(); };
+    });
+  }
+
+  var sectionMap = {};
+  function sectionFor(key, label) {
+    if (sectionMap[key]) return sectionMap[key];
+    var sec = document.createElement('div');
+    sec.className = 'month';
+    sec.innerHTML = '<div class="month-h"><h2>' + esc(label) + '</h2><span class="n" data-n="0">0 张</span></div><div class="wall"></div>';
+    $('#wall').appendChild(sec);
+    sectionMap[key] = sec;
+    return sec;
+  }
+
+  function fallbackCard(it) {
+    return '<div class="vfall"><span class="play">▶</span>' +
+      '<span class="vfn">' + esc(it.name) + '</span>' +
+      (it.duration ? '<span class="vdur">' + fmtDur(it.duration) + '</span>' : '') + '</div>';
+  }
+
+  function cardHtml(it) {
+    var vid = it.kind === 'video';
+    var badge = vid
+      ? '<span class="kind">影片' + (it.duration ? ' · ' + fmtDur(it.duration) : '') + '</span>'
+      : '';
+    // 明确失败（服务端 thumbError）才上「文件名 + 时长 + ▶」兜底卡片；
+    // 尚未就绪的仍走 img，请求时服务端按需重生成，加载失败由 onerror 再切兜底
+    if (vid && it.thumbError) {
+      return '<a class="ph" data-id="' + it.id + '" href="javascript:void(0)">' + badge +
+        fallbackCard(it) + '<span class="cap">' + esc(it.name) + '</span></a>';
+    }
+    var play = vid ? '<span class="play">▶</span>' : '';
+    return '<a class="ph" data-id="' + it.id + '" href="javascript:void(0)">' + badge + play +
+      '<img loading="lazy" src="/api/photos/thumb?id=' + it.id + '" alt="' + esc(it.name) + '">' +
+      '<span class="cap">' + esc(it.name) + '</span></a>';
+  }
+
+  function bindCard(a) {
+    if (a.onclick) return;
+    a.onclick = function () { openLightbox(a.getAttribute('data-id')); };
+    var im = a.querySelector('img');
+    if (im && !im.onerror) {
+      im.onerror = function () {
+        var it = S.byId[a.getAttribute('data-id')];
+        im.remove();
+        if (it && !a.querySelector('.vfall')) a.insertAdjacentHTML('afterbegin', fallbackCard(it));
+      };
+    }
+  }
+
+  function appendItems(items) {
+    items.forEach(function (it) {
+      S.items.push(it); S.byId[it.id] = it;
+      var m = S.months.find(function (x) { return x.key === it.month; });
+      var sec = sectionFor(it.month, m ? m.label : it.month);
+      sec.querySelector('.wall').insertAdjacentHTML('beforeend', cardHtml(it));
+      var n = sec.querySelector('[data-n]');
+      var c = (Number(n.getAttribute('data-n')) || 0) + 1;
+      n.setAttribute('data-n', c);
+      n.textContent = c + ' 张';
+    });
+    Array.prototype.forEach.call($('#wall').querySelectorAll('.ph'), bindCard);
+  }
+
+  function resetWall() {
+    S.items = []; S.byId = {}; S.offset = 0; S.done = false; sectionMap = {};
+    $('#wall').innerHTML = '';
+  }
+
+  function loadMore() {
+    if (S.loading || S.done) return;
+    S.loading = true; $('#loading').hidden = false;
+    var u = '/api/photos/list?offset=' + S.offset + '&limit=60';
+    if (S.month) u += '&month=' + encodeURIComponent(S.month);
+    fetch(u, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) throw new Error(d.message || '读取失败');
+      S.total = d.total; S.months = d.months || [];
+      appendItems(d.items || []);
+      S.offset += (d.items || []).length;
+      if (S.offset >= S.total || !(d.items || []).length) S.done = true;
+      renderMonths();
+      $('#count').textContent = S.offset + ' / ' + S.total + ' 张';
+      $('#fTotal').textContent = S.total;
+      $('#fMonths').textContent = S.months.length;
+      $('#fLatest').textContent = (d.items && d.items[0]) ? new Date(d.items[0].date).getMonth() + 1 + '月' : '—';
+      $('#updated').textContent = '更新于 ' + new Date().toTimeString().slice(0, 8);
+      renderSkipped(d.skipped || []);
+    }).catch(function (e) {
+      $('#wall').innerHTML = '<div class="empty"><b>相片没读出来</b><span>' + esc(e.message || e) + '</span></div>';
+    }).finally(function () { S.loading = false; $('#loading').hidden = true; });
+  }
+
+  function renderSkipped(skipped) {
+    var el = $('#skippedNotice');
+    if (!skipped.length) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = skipped.map(function (s) {
+      return '· ' + esc(s.dir) + '：' + esc(s.reason);
+    }).join('<br>');
+  }
+
+  /* ── 扫描进度 ── */
+  function pollStatus() {
+    fetch('/api/photos/scan-status', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      var st = d.status || {};
+      if (!st.running && st.phase !== 'done' && st.phase !== 'idle') return;
+      var box = $('#progress');
+      if (st.running || st.phase === 'done') {
+        $('#fThumbs').textContent = st.thumbsDone || 0;
+      }
+      if (st.running) {
+        box.hidden = false;
+        var total = st.thumbsTotal || 0;
+        var pct = total ? Math.round(st.thumbsDone / total * 100) : (st.phase === 'meta' ? Math.min(90, Math.round(st.metaDone / Math.max(1, st.total) * 100)) : 0);
+        $('#pbar').style.width = pct + '%';
+        $('#pmsg').textContent = st.message + (total ? '（' + st.thumbsDone + '/' + total + '）' : '');
+        setTimeout(pollStatus, 1800);
+      } else {
+        box.hidden = true;
+        if (st.finishedAt) resetWall(), loadMore();
+      }
+    }).catch(function () {});
+  }
+
+  $('#btnScan').onclick = function () {
+    fetch('/api/photos/scan', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
+      toast(d.ok ? '开始后台扫描' : '扫描没启动');
+      pollStatus();
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  /* ── 大图 ── */
+  var lbIndex = -1, savedScroll = null;
+  function renderLightbox() {
+    var it = S.items[lbIndex];
+    if (!it) return;
+    S.currentId = it.id;
+    var img = $('#lbImg'), vid = $('#lbVideo');
+    var isVid = it.kind === 'video';
+    // 先停掉上一个媒体并清 src，避免切换/关闭后仍在后台解码
+    vid.pause(); vid.removeAttribute('src'); vid.load();
+    img.removeAttribute('src');
+    if (isVid) {
+      vid.hidden = false; img.hidden = true;
+      vid.src = '/api/photos/full?id=' + it.id;
+      vid.muted = true; vid.autoplay = true;
+      var p = vid.play(); if (p && p.catch) p.catch(function () {});
+    } else {
+      img.hidden = false; vid.hidden = true;
+      img.src = '/api/photos/full?id=' + it.id;
+    }
+    $('#lbName').textContent = it.name;
+    $('#lbDate').textContent = fmtDate(it.date);
+    $('#lbSize').textContent = fmtSize(it.size);
+    $('#lbDir').textContent = it.dir;
+    $('#lbDims').textContent = it.duration ? fmtDur(it.duration) : '';
+    $('#lbDownload').href = '/api/photos/full?id=' + it.id;
+    $('#lbDownload').setAttribute('download', it.name);
+    fetch('/api/photos/info?id=' + it.id).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok || d.item.id !== it.id) return;
+      if (d.item.dims) $('#lbDims').textContent = d.item.dims.width + '×' + d.item.dims.height;
+    }).catch(function () {});
+    $('#lbPrev').disabled = lbIndex <= 0;
+    $('#lbNext').disabled = lbIndex >= S.items.length - 1;
+  }
+
+  function openLightbox(id) {
+    lbIndex = S.items.findIndex(function (x) { return x.id === id; });
+    if (lbIndex < 0) return;
+    if (savedScroll == null) savedScroll = window.scrollY || document.documentElement.scrollTop;
+    $('#lightbox').hidden = false;
+    renderLightbox();
+  }
+  function closeLightbox() {
+    var lb = $('#lightbox');
+    if (lb.hidden) return;
+    var img = $('#lbImg'), vid = $('#lbVideo');
+    vid.pause(); vid.removeAttribute('src'); vid.load();
+    img.removeAttribute('src');
+    lb.hidden = true;
+    lbIndex = -1; S.currentId = null;
+    if (savedScroll != null) {
+      var y = savedScroll; savedScroll = null;
+      window.scrollTo(0, y);
+    }
+  }
+  function nav(d) {
+    var n = lbIndex + d;
+    if (n < 0 || n >= S.items.length) return;
+    lbIndex = n; renderLightbox();
+  }
+
+  $('#lbClose').onclick = function (e) { e.stopPropagation(); closeLightbox(); };
+  $('#lbPrev').onclick = function (e) { e.stopPropagation(); nav(-1); };
+  $('#lbNext').onclick = function (e) { e.stopPropagation(); nav(1); };
+  // 点遮罩（弹层本体 / 舞台空白处）关闭；点图片、视频、按钮不触发
+  $('#lightbox').onclick = function (e) {
+    var t = e.target;
+    if (t === $('#lightbox') || t === $('#lbStage')) closeLightbox();
+  };
+  $('#lbCopy').onclick = function () { copyText(castFullUrl(S.currentId)); };
+  $('#lbCast').onclick = function () { openCast(S.currentId); };
+
+  /* ── 本机网络 ── */
+  function loadLan() {
+    return fetch('/api/photos/lan').then(function (r) { return r.json(); }).then(function (d) {
+      S.lan = d;
+      var el = $('#lanNotice');
+      if (d.lanMode) {
+        el.hidden = true;
+      } else {
+        el.hidden = false;
+        el.innerHTML = '当前客厅只监听 127.0.0.1，电视访问不到本机直链；只有用 <code>--lan</code> 方式启动（监听 0.0.0.0）时投屏才真正连通。探测到的本机局域网 IP：' +
+          (d.lanIP || '未识别') + '，端口 ' + d.port + '。';
+      }
+    }).catch(function () {});
+  }
+
+  function castFullUrl(id) {
+    if (!S.lan || !S.lan.lanIP) return '/api/photos/full?id=' + id;
+    return 'http://' + S.lan.lanIP + ':' + S.lan.port + '/api/photos/full?id=' + id;
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('直链已复制'); }).catch(function () { toast('复制失败', true); });
+    } else {
+      var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand('copy'); toast('直链已复制'); } catch { toast('复制失败', true); }
+      document.body.removeChild(ta);
+    }
+  }
+
+  /* ── 投屏 ── */
+  function openCast(id) {
+    S.currentId = id;
+    var it = S.byId[id];
+    $('#castStatus').textContent = it ? '当前图片：' + it.name : '';
+    $('#castLink').textContent = castFullUrl(id);
+    $('#castDownload').href = '/api/photos/full?id=' + id;
+    $('#castDownload').setAttribute('download', it ? it.name : 'image');
+    var warn = $('#castLan');
+    if (S.lan && !S.lan.lanMode) {
+      warn.hidden = false;
+      warn.textContent = '注意：客厅未用 --lan 启动，电视无法访问 ' + (S.lan.lanIP || '本机') + ' 的直链；投屏指令可能发出但电视取不到画面。';
+    } else { warn.hidden = true; }
+    $('#dlnaDevices').innerHTML = ''; $('#dlnaEmpty').hidden = true;
+    $('#btnDoCast').disabled = true; S.selectedDevice = null;
+    $('#castModal').classList.add('on'); $('#castModal').setAttribute('aria-hidden', 'false');
+    discover();
+  }
+  function closeCast() {
+    $('#castModal').classList.remove('on'); $('#castModal').setAttribute('aria-hidden', 'true');
+  }
+
+  function discover() {
+    $('#castHint').textContent = '正在监听 SSDP 应答…';
+    $('#dlnaDevices').innerHTML = ''; $('#dlnaEmpty').hidden = true;
+    fetch('/api/photos/dlna/discover', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
+      $('#castHint').textContent = d.lanIP ? '本机局域网 IP：' + d.lanIP : '未识别到局域网 IP';
+      var devs = d.devices || [];
+      if (!devs.length) { $('#dlnaEmpty').hidden = false; $('#btnDoCast').disabled = true; return; }
+      $('#dlnaEmpty').hidden = true;
+      var box = $('#dlnaDevices');
+      box.innerHTML = devs.map(function (v, i) {
+        return '<div class="dlna-dev' + (i === 0 ? ' on' : '') + '" data-i="' + i + '">' +
+          '<input type="radio" name="dev" ' + (i === 0 ? 'checked' : '') + '>' +
+          '<div><div class="nm">' + esc(v.name) + '</div><div class="loc">' + esc(v.location) + '</div></div></div>';
+      }).join('');
+      S.selectedDevice = devs[0].id;
+      $('#btnDoCast').disabled = false;
+      Array.prototype.forEach.call(box.children, function (c) {
+        c.onclick = function () {
+          var i = Number(c.getAttribute('data-i'));
+          S.selectedDevice = devs[i].id;
+          Array.prototype.forEach.call(box.children, function (x) { x.classList.remove('on'); });
+          c.classList.add('on');
+          c.querySelector('input').checked = true;
+        };
+      });
+      if (!devs.some(function (v) { return v.ready; })) {
+        $('#dlnaEmpty').hidden = false;
+        $('#dlnaEmpty').textContent = '发现的设备不支持 AVTransport 控制，无法直接推送。';
+      }
+    }).catch(function (e) {
+      $('#dlnaEmpty').hidden = false;
+      $('#dlnaEmpty').textContent = '发现过程出错：' + esc(e.message || e);
+    });
+  }
+
+  $('#btnCast').onclick = function () { if (S.currentId) openCast(S.currentId); };
+  $('#btnDiscover').onclick = discover;
+  $('#castClose').onclick = closeCast;
+  $('#castCancel').onclick = closeCast;
+  $('#castCopy').onclick = function () { copyText($('#castLink').textContent); };
+  $('#castModal').onclick = function (e) { if (e.target.id === 'castModal') closeCast(); };
+
+  $('#btnDoCast').onclick = function () {
+    if (!S.selectedDevice || !S.currentId) return;
+    var btn = this; btn.disabled = true;
+    fetch('/api/photos/dlna/cast', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ deviceId: S.selectedDevice, id: S.currentId }),
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ok) { toast(d.message || '已发送到电视'); closeCast(); }
+      else {
+        toast(d.message || '投屏未成功', true);
+        if (d.warning) $('#castStatus').textContent = d.warning;
+      }
+    }).catch(function (e) { toast(e.message, true); }).finally(function () { btn.disabled = false; });
+  };
+
+  /* ── 事件 ── */
+  document.addEventListener('keydown', function (e) {
+    if (!$('#lightbox').hidden) {
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowLeft') nav(-1);
+      else if (e.key === 'ArrowRight') nav(1);
+    } else if ($('#castModal').classList.contains('on') && e.key === 'Escape') closeCast();
+  });
+
+  var io = new IntersectionObserver(function (entries) {
+    if (entries[0].isIntersecting) loadMore();
+  }, { rootMargin: '300px' });
+  io.observe($('#sentinel'));
+
+  loadLan();
+  loadMore();
+  pollStatus();
+  setInterval(pollStatus, 15000);
+})();
+</script>
+</body>
+</html>

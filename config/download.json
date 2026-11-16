@@ -1,0 +1,6 @@
+{
+  "dir": "~/Downloads/五五下载",
+  "concurrency": 3,
+  "webtorrentEnabled": true,
+  "httpTimeoutMs": 60000
+}

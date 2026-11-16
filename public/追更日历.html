@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>追更日历 · 五五客厅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='28' font-family='serif' fill='%23c489a9' text-anchor='middle'%3E历%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/room.css">
+<style>
+  /* 下次更新倒计时主块 */
+  .hero{
+    display:flex;align-items:baseline;gap:22px;flex-wrap:wrap;
+    background:linear-gradient(180deg,rgba(196,137,169,.10),rgba(255,255,255,.015));
+    border:1px solid var(--edge);border-radius:14px;padding:20px 22px;
+  }
+  .hero .big{font-family:var(--serif);font-size:34px;font-weight:600;color:var(--a);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .hero .next-title{font-size:16px;font-weight:600;letter-spacing:.02em;color:var(--ink)}
+  .hero .next-meta{font-size:11.5px;color:var(--faint);margin-top:3px}
+  .hero .none{font-size:13px;color:var(--muted)}
+
+  /* 周视图七列 */
+  .week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+  .day{
+    border:1px solid var(--line);border-radius:11px;padding:10px 10px 12px;
+    background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008));
+    min-height:150px;display:flex;flex-direction:column;gap:8px;
+  }
+  .day.today{border-color:var(--edge);background:var(--soft)}
+  .day-h{display:flex;align-items:baseline;gap:6px}
+  .day-h b{font-size:12px;letter-spacing:.08em;color:var(--ink)}
+  .day-h .wd{font-size:10px;color:var(--faint)}
+  .day-h .today-tag{margin-left:auto;font-size:9.5px;color:var(--a);background:var(--soft);padding:1px 6px;border-radius:5px}
+  .cell{
+    border:1px solid var(--line2);border-radius:8px;padding:7px 9px;
+    background:rgba(255,255,255,.02);cursor:pointer;transition:.16s;
+  }
+  .cell:hover{border-color:var(--edge);background:rgba(255,255,255,.05)}
+  .cell .t{font-size:11.5px;line-height:1.45;color:var(--ink);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .cell .m{font-size:10px;color:var(--faint);margin-top:3px;display:flex;gap:6px;align-items:center}
+  .cell .m .kind{color:var(--a)}
+  .cell.ep{display:flex;gap:8px}
+  .cell.ep img{width:34px;height:46px;border-radius:5px;object-fit:cover;flex:0 0 auto;background:rgba(255,255,255,.06)}
+  .day-empty{font-size:10.5px;color:var(--faint);opacity:.6}
+
+  /* 番剧卡片 */
+  .ep-card{display:flex;flex-direction:column;gap:8px}
+  .ep-card .cover{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.05)}
+  .ep-card .cover img{width:100%;height:100%;object-fit:cover}
+  .ep-card .cover .badge{position:absolute;left:7px;bottom:7px;font-size:10px;background:rgba(6,7,9,.72);padding:2px 7px;border-radius:6px;color:var(--ink)}
+  .ep-card .t{font-size:12.5px;font-weight:600;line-height:1.4;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .ep-card .m{font-size:10.5px;color:var(--faint);display:flex;justify-content:space-between;gap:6px}
+  .ep-card .row{display:flex;gap:6px;margin-top:auto}
+  .ep-card .row .btn{flex:1}
+
+  /* 订阅源 / 手动条目卡片 */
+  .feed-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .feed-head b{font-size:13.5px;font-weight:600}
+  .feed-head .url{font-size:10px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46%}
+  .feed-head .ops{margin-left:auto;display:flex;gap:6px}
+  .feed-items{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .feed-item{display:flex;gap:8px;align-items:baseline;padding:6px 8px;border-radius:7px;transition:.15s}
+  .feed-item:hover{background:rgba(255,255,255,.04)}
+  .feed-item .t{font-size:12px;color:var(--ink);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .feed-item .when{font-size:10px;color:var(--faint);flex:0 0 auto}
+  .feed-item .dot{width:6px;height:6px;border-radius:50%;background:var(--a);flex:0 0 auto}
+  .track-card .t{font-size:14px;font-weight:600}
+  .track-card .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .track-card .count{margin-left:auto;font-family:var(--serif);color:var(--a);font-size:13px}
+  .track-card .src{font-size:10.5px;color:var(--faint);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .track-card .ops{display:flex;gap:6px;margin-top:10px}
+  .row2{display:flex;gap:9px;flex-wrap:wrap}
+  .row2 > *{flex:1;min-width:150px}
+  .unread-badge{background:var(--danger);color:#fff;border-radius:999px;font-size:10px;padding:1px 7px;margin-left:4px}
+  @media (max-width:1080px){.week{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  @media (max-width:760px){
+    .week{grid-template-columns:repeat(2,minmax(0,1fr));overflow-x:auto}
+    .hero .big{font-size:26px}
+  }
+</style>
+</head>
+<body data-room="calendar">
+<div class="grain" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="top">
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <div class="titlebar">
+      <h1><i></i>追更日历</h1>
+      <span class="sub">订阅源、番剧表、手动追更，都排进这一周</span>
+    </div>
+    <div class="top-act">
+      <button class="btn" id="btnRefresh" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+        刷新
+      </button>
+      <button class="btn" id="btnAddFeed" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        加订阅
+      </button>
+      <button class="btn primary" id="btnAddTrack" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        加追更
+      </button>
+    </div>
+  </header>
+
+  <section class="lede">
+    <div class="hero" id="hero">
+      <div class="big" id="heroBig">—</div>
+      <div>
+        <div class="next-title" id="heroTitle">还没有排期</div>
+        <div class="next-meta" id="heroMeta">加一条手动追更，或从番剧表里挑一部</div>
+      </div>
+    </div>
+    <div class="figs">
+      <div class="fig"><b id="fToday">—</b><span>今日更新</span></div>
+      <div class="fig"><b id="fUnread">—</b><span>未读</span></div>
+      <div class="fig"><b id="fFeeds">—</b><span>订阅源</span></div>
+      <div class="fig"><b id="fTracks">—</b><span>手动追更</span></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">
+      <span class="dot"></span><h2>本周排期</h2>
+      <span class="count" id="weekCount"></span>
+    </div>
+    <div class="week" id="week"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">
+      <span class="dot"></span><h2>本周番剧更新</h2>
+      <span class="count" id="biliCount"></span>
+      <div class="right"><button class="btn ghost sm" id="btnBiliRefresh" type="button">重新拉取</button></div>
+    </div>
+    <div class="grid c4" id="bili"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">
+      <span class="dot"></span><h2>订阅源</h2>
+      <span class="count" id="feedCount"></span>
+    </div>
+    <div class="grid c2" id="feeds"></div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h">
+      <span class="dot"></span><h2>我的追更</h2>
+      <span class="count" id="trackCount"></span>
+    </div>
+    <div class="grid c2" id="tracks"></div>
+  </section>
+
+  <footer class="foot">
+    <span>数据落在 runtime/calendar.json · 重启客厅也在</span>
+    <span id="updated">—</span>
+  </footer>
+</div>
+
+<!-- 加订阅弹层 -->
+<div class="modal" id="feedModal" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h3>添加 RSS / Atom 订阅</h3>
+      <button class="btn ghost icon x" id="feedClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="compose">
+      <input class="input" id="fUrl" placeholder="订阅链接，比如 https://sspai.com/feed">
+      <input class="input" id="fName" placeholder="自定义名字（留空取源标题）">
+      <div class="row2" style="justify-content:flex-end">
+        <button class="btn ghost" id="feedCancel" type="button">算了</button>
+        <button class="btn primary" id="feedSave" type="button">订阅</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 加 / 编辑追更弹层 -->
+<div class="modal" id="trackModal" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h3 id="trackTitle">加一条手动追更</h3>
+      <button class="btn ghost icon x" id="trackClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="compose">
+      <input class="input" id="tName" placeholder="名称，比如《某某漫画》">
+      <div class="row2">
+        <select class="select" id="tKind">
+          <option value="番剧">番剧</option>
+          <option value="剧集">剧集</option>
+          <option value="连载书">连载书</option>
+        </select>
+        <select class="select" id="tRuleType">
+          <option value="weekly">每周固定一天</option>
+          <option value="interval">每隔 N 天</option>
+        </select>
+      </div>
+      <div class="row2" id="weeklyRow">
+        <select class="select" id="tWeekday">
+          <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option>
+          <option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="7">周日</option>
+        </select>
+        <input class="input" id="tTime" placeholder="更新时间 20:00">
+      </div>
+      <div class="row2" id="intervalRow" style="display:none">
+        <input class="input" id="tDays" type="number" min="1" placeholder="每隔几天，比如 3">
+        <input class="input" id="tTime2" placeholder="更新时间 20:00">
+      </div>
+      <input class="input" id="tSource" placeholder="来源链接（可选）">
+      <input class="input" id="tProgress" placeholder="当前进度：看到第几集 / 第几章（可选）">
+      <div class="row2" style="justify-content:flex-end">
+        <button class="btn ghost" id="trackCancel" type="button">算了</button>
+        <button class="btn primary" id="trackSave" type="button">存进追更</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var S = { data: null, editing: null, seenPosted: false };
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+
+  function toast(msg, err) {
+    var t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.className = 'toast'; }, 2400);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function fmtTime(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts), now = Date.now(), diff = now - ts;
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+
+  function fmtClock(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  }
+
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    }).then(function (r) { return r.json(); });
+  }
+
+  /* ── 渲染 ── */
+
+  function renderHero() {
+    var d = S.data;
+    var big = $('#heroBig'), title = $('#heroTitle'), meta = $('#heroMeta');
+    if (!d.next) {
+      big.textContent = '—';
+      title.textContent = '还没有排期';
+      meta.textContent = '加一条手动追更，或从番剧表里挑一部';
+      return;
+    }
+    big.textContent = d.next.inText || '已更新';
+    title.textContent = d.next.title;
+    meta.textContent = (d.next.source || '') + ' · ' + new Date(d.next.when).toLocaleString('zh-CN', { hour12: false });
+  }
+
+  function renderFigs() {
+    var d = S.data;
+    $('#fToday').textContent = d.today;
+    $('#fUnread').textContent = d.unread;
+    $('#fFeeds').textContent = d.feeds.length;
+    $('#fTracks').textContent = d.tracks.length;
+  }
+
+  function cellTrack(t) {
+    return '<a class="cell" href="' + esc(t.sourceUrl || '#') + '" target="_blank" rel="noopener">' +
+      '<div class="t">' + esc(t.title) + '</div>' +
+      '<div class="m"><span class="kind">' + esc(t.kind) + '</span><span>' + esc(t.time || '') + '</span>' +
+      '<span data-next="' + t.nextAt + '">' + esc(t.inText) + '</span></div></a>';
+  }
+
+  function cellEp(ep) {
+    return '<a class="cell ep" href="' + esc(ep.url || '#') + '" target="_blank" rel="noopener">' +
+      (ep.cover ? '<img src="' + esc(ep.cover) + '" alt="">' : '') +
+      '<div style="min-width:0"><div class="t">' + esc(ep.title) + '</div>' +
+      '<div class="m"><span>' + esc(ep.pubTime || '') + '</span><span>' + esc(ep.episode || '') + '</span></div></div></a>';
+  }
+
+  function renderWeek() {
+    var d = S.data;
+    var el = $('#week');
+    el.innerHTML = d.week.map(function (day) {
+      var cells = '';
+      day.tracks.forEach(function (t) { cells += cellTrack(t); });
+      day.episodes.forEach(function (ep) { cells += cellEp(ep); });
+      if (!cells) cells = '<div class="day-empty">今天没有排期</div>';
+      return '<div class="day' + (day.isToday ? ' today' : '') + '">' +
+        '<div class="day-h"><b>周' + esc(day.label) + '</b>' +
+        (day.isToday ? '<span class="today-tag">今天</span>' : '') + '</div>' + cells + '</div>';
+    }).join('');
+    var total = d.week.reduce(function (s, x) { return s + x.tracks.length + x.episodes.length; }, 0);
+    $('#weekCount').textContent = total + ' 条排期';
+  }
+
+  function renderBili() {
+    var d = S.data;
+    var all = (d.bangumi.days || []).flatMap(function (x) { return x.episodes || []; });
+    $('#biliCount').textContent = all.length + ' 部';
+    if (!all.length) {
+      $('#bili').className = '';
+      $('#bili').innerHTML = '<div class="empty"><b>番剧表还没拉到</b><span>点右上角「重新拉取」试试</span></div>';
+      return;
+    }
+    $('#bili').className = 'grid c4';
+    $('#bili').innerHTML = all.map(function (ep) {
+      return '<div class="ep-card">' +
+        '<div class="cover"><img src="' + esc(ep.cover || '') + '" alt="" loading="lazy">' +
+        (ep.episode ? '<span class="badge">' + esc(ep.episode) + '</span>' : '') + '</div>' +
+        '<div class="t">' + esc(ep.title) + '</div>' +
+        '<div class="m"><span>周' + WEEK_CN(ep.weekday) + '</span><span>' + esc(ep.pubTime) + '</span></div>' +
+        '<div class="row">' +
+        '<a class="btn sm" href="' + esc(ep.url || '#') + '" target="_blank" rel="noopener">去看</a>' +
+        '<button class="btn sm primary" data-follow=\'' + JSON.stringify({ id: ep.id, title: ep.title, weekday: ep.weekday, time: ep.pubTime, url: ep.url }) + '\'>加入追更</button>' +
+        '</div></div>';
+    }).join('');
+    Array.prototype.forEach.call($('#bili').querySelectorAll('[data-follow]'), function (b) {
+      b.onclick = function () {
+        try { openTrack(null, JSON.parse(b.getAttribute('data-follow'))); }
+        catch (e) { toast('解析失败', true); }
+      };
+    });
+  }
+
+  function WEEK_CN(wd) { return ['一', '二', '三', '四', '五', '六', '日'][(wd || 1) - 1] || '一'; }
+
+  function feedStatus(f) {
+    if (f.ok === true) return '<span class="pill ok"><i></i>正常</span>';
+    if (f.ok === false) return '<span class="pill warn"><i></i>抓取失败</span>';
+    return '<span class="pill off"><i></i>待抓取</span>';
+  }
+
+  function renderFeeds() {
+    var d = S.data;
+    $('#feedCount').textContent = d.feeds.length + ' 个源';
+    if (!d.feeds.length) {
+      $('#feeds').className = '';
+      $('#feeds').innerHTML = '<div class="empty"><b>还没有订阅源</b><span>点右上角「加订阅」，填一个 RSS 链接</span></div>';
+      return;
+    }
+    $('#feeds').className = 'grid c2';
+    $('#feeds').innerHTML = d.feeds.map(function (f) {
+      var items = f.items.map(function (i) {
+        var unread = (i.date || 0) > d.seenAt;
+        return '<a class="feed-item" href="' + esc(i.link || '#') + '" target="_blank" rel="noopener">' +
+          (unread ? '<span class="dot"></span>' : '<span style="width:6px"></span>') +
+          '<span class="t">' + esc(i.title) + '</span><span class="when">' + fmtTime(i.date) + '</span></a>';
+      }).join('');
+      var fail = f.ok === false
+        ? '<div class="s" style="color:var(--warn)">失败：' + esc(f.failReason) +
+          (f.lastOkAt ? ' · 上次成功 ' + fmtTime(f.lastOkAt) : ' · 还没成功过') + '</div>'
+        : '<div class="s">上次抓取 ' + fmtTime(f.lastFetchAt) + ' · ' + f.total + ' 条' +
+          (f.unread ? ' · <span class="unread-badge">' + f.unread + ' 未读</span>' : '') + '</div>';
+      return '<div class="card">' +
+        '<div class="feed-head"><b>' + esc(f.name) + '</b>' + feedStatus(f) +
+        '<span class="url">' + esc(f.url) + '</span>' +
+        '<span class="ops"><button class="btn ghost sm" data-refresh="' + f.id + '">刷新</button>' +
+        '<button class="btn ghost sm danger" data-remove-feed="' + f.id + '">删除</button></span></div>' +
+        fail +
+        '<div class="feed-items">' + (items || '<div class="day-empty">暂无条目</div>') + '</div></div>';
+    }).join('');
+    Array.prototype.forEach.call($('#feeds').querySelectorAll('[data-refresh]'), function (b) {
+      b.onclick = function () {
+        post('/api/calendar/feed/refresh', { id: b.getAttribute('data-refresh') })
+          .then(function () { toast('已交给后台刷新'); setTimeout(load, 1500); })
+          .catch(function () { toast('刷新请求失败', true); });
+      };
+    });
+    Array.prototype.forEach.call($('#feeds').querySelectorAll('[data-remove-feed]'), function (b) {
+      b.onclick = function () {
+        if (!confirm('删掉这个订阅源？')) return;
+        post('/api/calendar/feed/remove', { id: b.getAttribute('data-remove-feed') })
+          .then(function (r) { if (r.ok) { toast('已删除'); load(); } else toast(r.message || '删除失败', true); })
+          .catch(function () { toast('删除失败', true); });
+      };
+    });
+  }
+
+  function renderTracks() {
+    var d = S.data;
+    $('#trackCount').textContent = d.tracks.length + ' 条';
+    if (!d.tracks.length) {
+      $('#tracks').className = '';
+      $('#tracks').innerHTML = '<div class="empty"><b>我的追更还空着</b><span>从番剧表一键加入，或手动加一条连载</span></div>';
+      return;
+    }
+    $('#tracks').className = 'grid c2';
+    $('#tracks').innerHTML = d.tracks.map(function (t) {
+      return '<div class="card track-card">' +
+        '<div class="t">' + esc(t.name) + '</div>' +
+        '<div class="meta"><span class="tag">' + esc(t.kind) + '</span>' +
+        '<span class="chip">' + esc(t.ruleLabel) + '</span>' +
+        (t.progress ? '<span class="chip">' + esc(t.progress) + '</span>' : '') +
+        '<span class="count" data-next="' + t.nextAt + '">' + esc(t.inText) + '</span></div>' +
+        (t.sourceUrl ? '<a class="src" href="' + esc(t.sourceUrl) + '" target="_blank" rel="noopener">' + esc(t.sourceUrl) + '</a>' : '<div class="src">无来源链接</div>') +
+        '<div class="ops"><button class="btn ghost sm" data-edit="' + t.id + '">编辑</button>' +
+        '<button class="btn ghost sm danger" data-remove-track="' + t.id + '">删除</button></div></div>';
+    }).join('');
+    Array.prototype.forEach.call($('#tracks').querySelectorAll('[data-edit]'), function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-edit');
+        var t = null;
+        d.tracks.forEach(function (x) { if (x.id === id) t = x; });
+        if (t) openTrack(t, null);
+      };
+    });
+    Array.prototype.forEach.call($('#tracks').querySelectorAll('[data-remove-track]'), function (b) {
+      b.onclick = function () {
+        if (!confirm('删掉这条追更？')) return;
+        post('/api/calendar/track/remove', { id: b.getAttribute('data-remove-track') })
+          .then(function (r) { if (r.ok) { toast('已删除'); load(); } else toast(r.message || '删除失败', true); })
+          .catch(function () { toast('删除失败', true); });
+      };
+    });
+  }
+
+  function renderAll() {
+    renderHero(); renderFigs(); renderWeek(); renderBili(); renderFeeds(); renderTracks();
+    $('#updated').textContent = '更新于 ' + new Date().toTimeString().slice(0, 8);
+  }
+
+  /* ── 倒计时本地走 ── */
+  function tick() {
+    if (!S.data) return;
+    var now = Date.now();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-next]'), function (el) {
+      var ts = Number(el.getAttribute('data-next'));
+      if (!ts) return;
+      var ms = ts - now;
+      var text;
+      if (ms <= 0) text = '已更新';
+      else {
+        var dd = Math.floor(ms / 86400000), hh = Math.floor((ms % 86400000) / 3600000), mm = Math.floor((ms % 3600000) / 60000);
+        if (dd > 0) text = '还有 ' + dd + ' 天 ' + hh + ' 小时';
+        else if (hh > 0) text = '还有 ' + hh + ' 小时 ' + mm + ' 分';
+        else text = '还有 ' + mm + ' 分';
+      }
+      el.textContent = text;
+    });
+    if (S.data.next) {
+      var big = $('#heroBig');
+      var ms = S.data.next.when - now;
+      if (ms > 0) {
+        var dd = Math.floor(ms / 86400000), hh = Math.floor((ms % 86400000) / 3600000), mm = Math.floor((ms % 3600000) / 60000);
+        big.textContent = (dd > 0 ? '还有 ' + dd + ' 天 ' + hh + ' 小时' : hh > 0 ? '还有 ' + hh + ' 小时 ' + mm + ' 分' : '还有 ' + mm + ' 分');
+      }
+    }
+  }
+
+  /* ── 拉数据 ── */
+  function load() {
+    return fetch('/api/calendar/overview', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || '接口没返回');
+        S.data = d;
+        renderAll();
+        if (!S.seenPosted) {
+          S.seenPosted = true;
+          post('/api/calendar/seen', {}).catch(function () {});
+        }
+      })
+      .catch(function (e) {
+        $('#week').innerHTML = '<div class="empty"><b>日历没读出来</b><span>' + esc(e.message || e) + '</span></div>';
+      });
+  }
+
+  /* ── 弹层：订阅 ── */
+  function openFeed() {
+    $('#fUrl').value = ''; $('#fName').value = '';
+    $('#feedModal').classList.add('on'); $('#feedModal').setAttribute('aria-hidden', 'false');
+    setTimeout(function () { $('#fUrl').focus(); }, 60);
+  }
+  function closeFeed() { $('#feedModal').classList.remove('on'); $('#feedModal').setAttribute('aria-hidden', 'true'); }
+
+  $('#btnAddFeed').onclick = openFeed;
+  $('#feedClose').onclick = closeFeed;
+  $('#feedCancel').onclick = closeFeed;
+  $('#feedModal').onclick = function (e) { if (e.target.id === 'feedModal') closeFeed(); };
+  $('#feedSave').onclick = function () {
+    var url = $('#fUrl').value.trim(), name = $('#fName').value.trim();
+    if (!/^https?:\/\/.+/.test(url)) { toast('填一个 http(s) 链接', true); return; }
+    $('#feedSave').disabled = true;
+    post('/api/calendar/feed/add', { url: url, name: name })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.message || '订阅失败');
+        closeFeed(); toast('已订阅，后台正在抓取'); load();
+      })
+      .catch(function (e) { toast(e.message, true); })
+      .finally(function () { $('#feedSave').disabled = false; });
+  };
+
+  /* ── 弹层：追更 ── */
+  function syncRuleRows() {
+    var type = $('#tRuleType').value;
+    $('#weeklyRow').style.display = type === 'weekly' ? '' : 'none';
+    $('#intervalRow').style.display = type === 'interval' ? '' : 'none';
+  }
+  $('#tRuleType').onchange = syncRuleRows;
+
+  function openTrack(track, preset) {
+    S.editing = track || null;
+    $('#trackTitle').textContent = track ? '编辑追更' : '加一条手动追更';
+    if (track) {
+      $('#tName').value = track.name || '';
+      $('#tKind').value = track.kind || '番剧';
+      $('#tRuleType').value = track.rule.type || 'weekly';
+      $('#tWeekday').value = String(track.rule.weekday || 1);
+      $('#tTime').value = track.rule.time || '20:00';
+      $('#tDays').value = track.rule.days || 3;
+      $('#tTime2').value = track.rule.time || '20:00';
+      $('#tSource').value = track.sourceUrl || '';
+      $('#tProgress').value = track.progress || '';
+    } else {
+      $('#tName').value = preset ? preset.title : '';
+      $('#tKind').value = '番剧';
+      $('#tRuleType').value = 'weekly';
+      $('#tWeekday').value = String((preset && preset.weekday) || 1);
+      $('#tTime').value = (preset && preset.time) || '20:00';
+      $('#tDays').value = 3; $('#tTime2').value = '20:00';
+      $('#tSource').value = (preset && preset.url) || '';
+      $('#tProgress').value = '';
+    }
+    syncRuleRows();
+    $('#trackModal').classList.add('on'); $('#trackModal').setAttribute('aria-hidden', 'false');
+    setTimeout(function () { $('#tName').focus(); }, 60);
+  }
+  function closeTrack() { $('#trackModal').classList.remove('on'); $('#trackModal').setAttribute('aria-hidden', 'true'); S.editing = null; }
+
+  $('#btnAddTrack').onclick = function () { openTrack(null, null); };
+  $('#trackClose').onclick = closeTrack;
+  $('#trackCancel').onclick = closeTrack;
+  $('#trackModal').onclick = function (e) { if (e.target.id === 'trackModal') closeTrack(); };
+
+  $('#trackSave').onclick = function () {
+    var type = $('#tRuleType').value;
+    var rule;
+    if (type === 'interval') {
+      var days = Math.floor(Number($('#tDays').value));
+      if (!Number.isFinite(days) || days < 1) { toast('间隔天数至少 1 天', true); return; }
+      rule = { type: 'interval', days: days, time: $('#tTime2').value.trim() || '20:00' };
+    } else {
+      rule = { type: 'weekly', weekday: Number($('#tWeekday').value), time: $('#tTime').value.trim() || '20:00' };
+    }
+    var payload = {
+      name: $('#tName').value.trim(),
+      kind: $('#tKind').value,
+      rule: rule,
+      sourceUrl: $('#tSource').value.trim(),
+      progress: $('#tProgress').value.trim(),
+    };
+    if (!payload.name) { toast('起个名字再存', true); return; }
+    var url = S.editing ? '/api/calendar/track/update' : '/api/calendar/track/add';
+    if (S.editing) payload.id = S.editing.id;
+    $('#trackSave').disabled = true;
+    post(url, payload)
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.message || '存不进去');
+        closeTrack(); toast(S.editing ? '已更新' : '已加入追更'); load();
+      })
+      .catch(function (e) { toast(e.message, true); })
+      .finally(function () { $('#trackSave').disabled = false; });
+  };
+
+  /* ── 其它按钮 ── */
+  $('#btnRefresh').onclick = function () {
+    post('/api/calendar/feed/refresh', {}).then(function () { toast('后台刷新中'); }).catch(function () {});
+    post('/api/calendar/seen', {}).catch(function () {});
+    load();
+  };
+  $('#btnBiliRefresh').onclick = function () {
+    fetch('/api/calendar/bangumi?refresh=1', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (r) { if (r.ok) { toast('番剧表已重新拉取'); load(); } else toast(r.message || '拉取失败', true); })
+      .catch(function () { toast('拉取失败', true); });
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeFeed(); closeTrack(); }
+  });
+
+  load();
+  setInterval(tick, 1000);
+  setInterval(load, 30000);
+})();
+</script>
+</body>
+</html>

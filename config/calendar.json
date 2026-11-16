@@ -1,0 +1,11 @@
+{
+  "_说明": "追更日历配置。缺字段由代码默认值补上；订阅源可在页面里增删，增删结果落在 runtime/calendar.json。",
+  "feeds": [
+    { "url": "https://sspai.com/feed", "name": "少数派" },
+    { "url": "https://www.gcores.com/rss", "name": "机核" },
+    { "url": "https://36kr.com/feed", "name": "36 氪" }
+  ],
+  "fetchIntervalMin": 10,
+  "bangumiCacheMin": 60,
+  "maxItemsPerFeed": 30
+}

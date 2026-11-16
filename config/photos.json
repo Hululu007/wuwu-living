@@ -1,0 +1,7 @@
+{
+  "_说明": "相册索引配置。dirs 支持 ~ 开头；concurrency 为缩略图并发上限；thumbSize 为缩略图边长（px）。",
+  "dirs": ["~/Downloads", "~/Desktop", "~/Pictures"],
+  "concurrency": 4,
+  "thumbSize": 480,
+  "maxDepth": 12
+}

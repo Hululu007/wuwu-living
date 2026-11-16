@@ -1,0 +1,49 @@
+{
+  "_说明": "四个项目的位置、内部端口与对外路径。换了路径改这里，重启客厅即可生效。内部端口只给客厅用，对外始终只有 8890。",
+  "apps": {
+    "magnet": {
+      "name": "搜磁力",
+      "kind": "web",
+      "path": "/magnet",
+      "port": 7788,
+      "dir": "/path/to/D盘/magnet-search",
+      "script": "start.sh",
+      "startArg": "start",
+      "stopArg": "stop",
+      "base": "http://127.0.0.1:7788"
+    },
+    "book": {
+      "name": "看书",
+      "kind": "app",
+      "path": "/book",
+      "bundle": "Reader",
+      "db": "/path/to/data/reader.db",
+      "port": 1122,
+      "base": "http://127.0.0.1:1122",
+      "webPort": 1122,
+      "webSettings": "/path/to/data/web-settings.json"
+    },
+    "music": {
+      "name": "听音乐",
+      "kind": "web",
+      "path": "/music",
+      "port": 8811,
+      "dir": "/path/to/new-chat-1/聆听音乐网页版",
+      "script": "music.sh",
+      "startArg": "start",
+      "stopArg": "stop",
+      "base": "http://127.0.0.1:8811"
+    },
+    "vod": {
+      "name": "看视频",
+      "kind": "web",
+      "path": "/vod",
+      "port": 8900,
+      "dir": "/path/to/项目/请看",
+      "script": "vod.sh",
+      "startArg": "start",
+      "stopArg": "stop",
+      "base": "http://127.0.0.1:8900"
+    }
+  }
+}

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>笔记库 · 五五客厅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='28' font-family='serif' fill='%23c0b79c' text-anchor='middle'%3E记%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/room.css">
+<style>
+  .note{
+    display:flex;flex-direction:column;gap:8px;cursor:pointer;
+    background:linear-gradient(180deg,rgba(255,255,255,.042),rgba(255,255,255,.012));
+    border:1px solid var(--line);border-radius:11px;padding:15px 16px;transition:.18s;
+  }
+  .note:hover{border-color:var(--edge);background:rgba(255,255,255,.055);transform:translateY(-1px)}
+  .note-h{display:flex;align-items:baseline;gap:8px}
+  .note-h b{font-size:14.5px;font-weight:600;letter-spacing:.02em;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .note-h .kind{font-size:10px;color:var(--a);background:var(--soft);padding:2px 6px;border-radius:4px;flex:0 0 auto}
+  .note-h .when{margin-left:auto;font-size:10.5px;color:var(--faint);flex:0 0 auto}
+  .note p{margin:0;font-size:12.5px;line-height:1.85;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .note .quote{border-left:2px solid var(--edge);padding-left:10px;font-family:var(--serif);color:#cbc4b8}
+  .note-f{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:2px}
+  .note-f .src{font-size:10.5px;color:var(--faint);margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+  .note-f .src a{color:var(--muted);text-decoration:none}
+  .note-f .src a:hover{color:var(--a)}
+  .note .act{color:var(--faint);opacity:0;transition:.16s;background:none;border:0;cursor:pointer;padding:3px;border-radius:5px;line-height:1}
+  .note:hover .act{opacity:1}
+  .note .act:hover{background:rgba(255,255,255,.08);color:var(--ink)}
+  .note .act.danger:hover{color:#f0b3a9}
+  .note .pin{color:var(--faint);opacity:0;transition:.16s}
+  .note:hover .pin{opacity:1}
+  .pin.on{color:var(--a);opacity:1}
+  .filters{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .compose{display:flex;flex-direction:column;gap:11px}
+  .compose .row{display:flex;gap:9px;flex-wrap:wrap}
+  .compose .row > *{flex:1;min-width:150px}
+  .hl{background:rgba(192,183,156,.22);color:var(--ink);border-radius:2px;padding:0 1px}
+  .toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+  .stat-inline{font-size:11px;color:var(--faint);letter-spacing:.04em}
+  .tip{font-size:11px;color:var(--faint);line-height:1.8}
+  .seg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+  .seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:11px;padding:6px 11px;cursor:pointer}
+  .seg button.on{background:var(--soft);color:var(--a)}
+  .tag-list{display:flex;flex-direction:column;gap:8px;max-height:240px;overflow:auto;margin:6px 0 12px}
+  .tag-row{display:flex;align-items:center;gap:9px;font-size:12.5px}
+  .tag-row .n{color:var(--a);min-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tag-row .c{color:var(--faint);font-size:10.5px;margin-left:auto}
+  @media (max-width:640px){
+    .note-f .src{max-width:100%}
+    .note .act{opacity:.8}
+  }
+</style>
+</head>
+<body data-room="notes">
+<div class="grain" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="top">
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <div class="titlebar">
+      <h1><i></i>笔记库</h1>
+      <span class="sub">划线、随手记、随想，都收在这一处</span>
+    </div>
+    <div class="top-act">
+      <button class="btn" id="btnExport" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>
+        导出当前
+      </button>
+      <button class="btn primary" id="btnNew" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        写一条
+      </button>
+    </div>
+  </header>
+
+  <section class="lede">
+    <p>书里的句子、片子里的一句话、下载时冒出来的念头，按来源归在一起。<br>
+    视频页右上角的「记一笔」会存到这里，来源标为看片；书房划线、下载、听歌、相册的随想也都归这间房。中文按两个字切、英文按词切，搜得动。</p>
+    <div class="figs">
+      <div class="fig"><b id="fTotal">—</b><span>条笔记</span></div>
+      <div class="fig"><b id="fToday">—</b><span>今天新增</span></div>
+      <div class="fig"><b id="fTags">—</b><span>个标签</span></div>
+      <div class="fig"><b id="fChars">—</b><span>字</span></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+      <input class="input" id="q" type="search" placeholder="搜标题、正文、标签、来源…" autocomplete="off">
+    </label>
+    <div class="seg" id="segSort">
+      <button type="button" data-sort="time">最新</button>
+      <button type="button" data-sort="rel">相关度</button>
+    </div>
+    <div class="filters" id="kinds"></div>
+    <div class="filters" id="tags"></div>
+    <span class="stat-inline" id="count"></span>
+  </div>
+
+  <div id="list" class="grid c2"></div>
+
+  <footer class="foot">
+    <span>数据落在 runtime/notes.json · 重启客厅也在</span>
+    <span id="updated">—</span>
+  </footer>
+</div>
+
+<div class="modal" id="modal" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h3 id="sheetTitle">写一条笔记</h3>
+      <button class="btn ghost icon x" id="btnClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="compose">
+      <input class="input" id="nTitle" placeholder="标题（留空就取正文开头）">
+      <textarea class="textarea" id="nBody" placeholder="正文。可以是一段摘抄、一个念头、一段想记住的话。"></textarea>
+      <input class="input" id="nQuote" placeholder="原文引用（可选，比如书里划的那句）">
+      <div class="row">
+        <select class="select" id="nKind">
+          <option value="manual">随手记</option>
+          <option value="book">看书</option>
+          <option value="video">看片</option>
+          <option value="download">下载</option>
+          <option value="music">听歌</option>
+          <option value="photo">相册</option>
+        </select>
+        <input class="input" id="nSource" placeholder="来源（书名 / 片名 / 任务名）">
+        <input class="input" id="nTags" placeholder="标签，空格或逗号分开">
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn ghost" id="btnCancel" type="button">算了</button>
+        <button class="btn primary" id="btnSave" type="button">存进笔记库</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="tagModal" aria-hidden="true">
+  <div class="sheet" style="max-width:440px">
+    <div class="sheet-h">
+      <h3>标签管理</h3>
+      <button class="btn ghost icon x" id="tagClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="compose">
+      <div class="row">
+        <select class="select" id="tFrom"><option value="">选一个标签</option></select>
+        <input class="input" id="tTo" placeholder="改成这个名字（合并到它）">
+      </div>
+      <div class="tag-list" id="tagList"></div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn ghost" id="tagCancel" type="button">算了</button>
+        <button class="btn primary" id="tagApply" type="button">改名 / 合并</button>
+      </div>
+      <p class="tip">同一个名字出现在多条笔记里时，会把旧标签统一替换成新名字；新名字已存在时即合并。</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var S = { q: '', kind: '', tag: '', sort: '', notes: [], tags: [], editing: null };
+  var $ = function (s, el) { return (el || document).querySelector(s); };
+
+  function toast(msg, err) {
+    var t = $('#toast');
+    t.textContent = msg;
+    t.className = 'toast on' + (err ? ' err' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.className = 'toast'; }, 2400);
+  }
+
+  function when(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts), now = Date.now(), diff = (now - ts) / 1000;
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
+    if (diff < 86400 * 7) return Math.floor(diff / 86400) + ' 天前';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function mark(text, q) {
+    var t = esc(text);
+    if (!q) return t;
+    var qq = q.trim();
+    if (!qq) return t;
+    try {
+      var re = new RegExp('(' + qq.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      return t.replace(re, '<span class="hl">$1</span>');
+    } catch (e) { return t; }
+  }
+
+  function renderSort() {
+    Array.prototype.forEach.call($('#segSort').children, function (b) {
+      var on = S.sort === b.getAttribute('data-sort');
+      b.className = on ? 'on' : '';
+    });
+  }
+
+  function renderKinds(kinds) {
+    var el = $('#kinds');
+    var html = '<span class="chip btn-ish' + (!S.kind ? ' on' : '') + '" data-kind="">全部来源</span>';
+    kinds.forEach(function (k) {
+      if (!k.count && k.kind !== S.kind) return;
+      html += '<span class="chip btn-ish' + (S.kind === k.kind ? ' on' : '') + '" data-kind="' + k.kind + '">' + esc(k.name) + ' ' + k.count + '</span>';
+    });
+    el.innerHTML = html;
+    Array.prototype.forEach.call(el.children, function (c) {
+      c.onclick = function () { S.kind = c.getAttribute('data-kind'); load(); };
+    });
+  }
+
+  function renderTags(tags) {
+    var el = $('#tags');
+    var html = '<span class="stat-inline">标签</span>';
+    tags.slice(0, 14).forEach(function (t) {
+      html += '<span class="chip btn-ish' + (S.tag === t.name ? ' on' : '') + '" data-tag="' + esc(t.name) + '">#' + esc(t.name) + ' <i style="opacity:.5;font-style:normal">' + t.count + '</i></span>';
+    });
+    html += '<button class="chip btn-ish" id="btnTagMgr" type="button">管理</button>';
+    el.innerHTML = html;
+    Array.prototype.forEach.call(el.children, function (c) {
+      if (c.id === 'btnTagMgr') { c.onclick = openTagMgr; return; }
+      var v = c.getAttribute('data-tag');
+      if (!v) return;
+      c.onclick = function () { S.tag = S.tag === v ? '' : v; load(); };
+    });
+  }
+
+  function noteCard(n) {
+    var tags = (n.tags || []).map(function (t) { return '<span class="tag">#' + esc(t) + '</span>'; }).join('');
+    var body = n.quote
+      ? '<p class="quote">' + mark(n.quote, S.q) + '</p>' + (n.body ? '<p>' + mark(n.excerpt, S.q) + '</p>' : '')
+      : '<p>' + mark(n.body || n.excerpt, S.q) + '</p>';
+    var src = n.source && n.source.url
+      ? '<a href="' + esc(n.source.url) + '" target="_blank" rel="noopener" data-src="' + n.id + '">' + esc(n.source.label || '随手记') + '</a>'
+      : esc(n.source && n.source.label || '随手记');
+    return '<div class="note" data-id="' + n.id + '">' +
+      '<div class="note-h"><b>' + mark(n.title || '未命名', S.q) + '</b>' +
+      '<span class="kind">' + esc(n.kindName) + '</span>' +
+      '<span class="when">' + when(n.createdAt) + '</span></div>' +
+      body +
+      '<div class="note-f"><span class="src">' + src + '</span>' +
+      (tags || '') +
+      '<button class="act pin' + (n.pinned ? ' on' : '') + '" data-pin="' + n.id + '" title="置顶" type="button">★</button>' +
+      '<button class="act" data-export="' + n.id + '" title="导出这条" type="button">' +
+        '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/></svg>' +
+      '</button>' +
+      '<button class="act danger" data-del="' + n.id + '" title="删除" type="button">' +
+        '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>' +
+      '</button>' +
+      '</div></div>';
+  }
+
+  function paint() {
+    var list = $('#list');
+    if (!S.notes.length) {
+      list.className = '';
+      list.innerHTML = '<div class="empty">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h9l4 4v14H6z"/><path d="M9 10h7M9 14h7M9 18h4"/></svg>' +
+        (S.q || S.kind || S.tag
+          ? '<b>这个条件下没有笔记</b><span>换个词，或者取消筛选</span>'
+          : '<b>笔记库还空着</b><span>写第一条，或者从书房划线、视频页「记一笔」里收进来</span><button class="btn primary" id="emptyNew" type="button">写一条</button>') +
+        '</div>';
+      var b = $('#emptyNew');
+      if (b) b.onclick = openNew;
+      return;
+    }
+    list.className = 'grid c2';
+    list.innerHTML = S.notes.map(noteCard).join('');
+    Array.prototype.forEach.call(list.children, function (c) {
+      c.onclick = function (e) {
+        if (e.target.closest('[data-pin],[data-export],[data-del],[data-src]')) return;
+        openEdit(c.getAttribute('data-id'));
+      };
+      var pin = c.querySelector('[data-pin]');
+      if (pin) pin.onclick = function (e) {
+        e.stopPropagation();
+        var id = pin.getAttribute('data-pin');
+        fetch('/api/notes/update', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: id, pinned: !pin.classList.contains('on') }) })
+          .then(function (r) { return r.json(); }).then(load).catch(function () { toast('置顶失败', true); });
+      };
+      var ex = c.querySelector('[data-export]');
+      if (ex) ex.onclick = function (e) {
+        e.stopPropagation();
+        var id = ex.getAttribute('data-export');
+        window.location.href = '/api/notes/export?ids=' + encodeURIComponent(id);
+      };
+      var del = c.querySelector('[data-del]');
+      if (del) del.onclick = function (e) {
+        e.stopPropagation();
+        var id = del.getAttribute('data-del');
+        var n = S.notes.filter(function (x) { return x.id === id; })[0];
+        if (!confirm('删除这条笔记？\n《' + (n && n.title || '未命名') + '》\n删了就找不回来了。')) return;
+        fetch('/api/notes/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: id }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (!d.ok) throw new Error(d.message || '删除失败'); toast('已删除'); load(); })
+          .catch(function (err) { toast(err.message || '删除失败', true); });
+      };
+    });
+  }
+
+  function load() {
+    var u = '/api/notes/list?limit=200';
+    if (S.q) u += '&q=' + encodeURIComponent(S.q);
+    if (S.kind) u += '&source=' + encodeURIComponent(S.kind);
+    if (S.tag) u += '&tag=' + encodeURIComponent(S.tag);
+    if (S.sort) u += '&sort=' + encodeURIComponent(S.sort);
+    fetch(u, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || 'fail');
+        S.notes = d.items;
+        S.tags = d.tags || [];
+        renderKinds(d.kinds || []);
+        renderTags(S.tags);
+        renderSort();
+        paint();
+        $('#count').textContent = d.shown + ' / ' + d.total + ' 条';
+        $('#updated').textContent = '更新于 ' + new Date().toTimeString().slice(0, 8);
+      })
+      .catch(function (e) {
+        $('#list').className = '';
+        $('#list').innerHTML = '<div class="empty"><b>笔记没读出来</b><span>' + esc(e.message || e) + '</span></div>';
+      });
+
+    fetch('/api/notes/stats', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) return;
+      $('#fTotal').textContent = d.total;
+      $('#fToday').textContent = d.today;
+      $('#fTags').textContent = d.tags;
+      $('#fChars').textContent = d.chars >= 1000 ? (d.chars / 1000).toFixed(1) + 'k' : d.chars;
+    }).catch(function () {});
+  }
+
+  function openNew() {
+    S.editing = null;
+    $('#sheetTitle').textContent = '写一条笔记';
+    $('#nTitle').value = ''; $('#nBody').value = ''; $('#nQuote').value = '';
+    $('#nKind').value = 'manual'; $('#nSource').value = ''; $('#nTags').value = '';
+    $('#modal').classList.add('on'); $('#modal').setAttribute('aria-hidden', 'false');
+    setTimeout(function () { $('#nTitle').focus(); }, 60);
+  }
+
+  function openEdit(id) {
+    var n = null;
+    for (var i = 0; i < S.notes.length; i++) if (S.notes[i].id === id) n = S.notes[i];
+    if (!n) return;
+    S.editing = n;
+    $('#sheetTitle').textContent = '编辑笔记';
+    $('#nTitle').value = n.title || '';
+    $('#nBody').value = n.body || '';
+    $('#nQuote').value = n.quote || '';
+    $('#nKind').value = (n.source && n.source.kind) || 'manual';
+    $('#nSource').value = (n.source && n.source.label) || '';
+    $('#nTags').value = (n.tags || []).join(' ');
+    $('#modal').classList.add('on'); $('#modal').setAttribute('aria-hidden', 'false');
+  }
+
+  function close() {
+    $('#modal').classList.remove('on');
+    $('#modal').setAttribute('aria-hidden', 'true');
+    S.editing = null;
+  }
+
+  function save() {
+    var payload = {
+      title: $('#nTitle').value.trim(),
+      body: $('#nBody').value.trim(),
+      quote: $('#nQuote').value.trim(),
+      tags: $('#nTags').value.trim(),
+      sourceKind: $('#nKind').value,
+      sourceLabel: $('#nSource').value.trim(),
+    };
+    if (!payload.body && !payload.quote && !payload.title) { toast('写点什么再存吧', true); return; }
+    var url = '/api/notes/' + (S.editing ? 'update' : 'create');
+    if (S.editing) payload.id = S.editing.id;
+    $('#btnSave').disabled = true;
+    fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || '存不进去');
+        close();
+        toast(S.editing ? '已更新' : '已存进笔记库');
+        load();
+      })
+      .catch(function (e) { toast(e.message, true); })
+      .finally(function () { $('#btnSave').disabled = false; });
+  }
+
+  /* 标签管理 */
+  function openTagMgr() {
+    var sel = $('#tFrom');
+    sel.innerHTML = '<option value="">选一个标签</option>';
+    var list = $('#tagList');
+    list.innerHTML = '';
+    S.tags.forEach(function (t) {
+      var op = document.createElement('option');
+      op.value = t.name; op.textContent = '#' + t.name;
+      sel.appendChild(op);
+      var row = document.createElement('div');
+      row.className = 'tag-row';
+      row.innerHTML = '<span class="tag">#' + esc(t.name) + '</span><span class="c">' + t.count + ' 条</span>';
+      row.onclick = function () { sel.value = t.name; };
+      list.appendChild(row);
+    });
+    $('#tTo').value = '';
+    $('#tagModal').classList.add('on');
+    $('#tagModal').setAttribute('aria-hidden', 'false');
+  }
+  function closeTagMgr() {
+    $('#tagModal').classList.remove('on');
+    $('#tagModal').setAttribute('aria-hidden', 'true');
+  }
+  $('#tagApply').onclick = function () {
+    var from = $('#tFrom').value.trim();
+    var to = $('#tTo').value.trim();
+    if (!from) { toast('先选要改的标签', true); return; }
+    if (!to) { toast('填新名字', true); return; }
+    fetch('/api/notes/tag/rename', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ from: from, to: to }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.message || '没改上');
+        if (S.tag === from) S.tag = to;
+        closeTagMgr();
+        toast('已改 ' + d.affected + ' 条');
+        load();
+      })
+      .catch(function (e) { toast(e.message || '没改上', true); });
+  };
+  $('#tagClose').onclick = closeTagMgr;
+  $('#tagCancel').onclick = closeTagMgr;
+  $('#tagModal').onclick = function (e) { if (e.target.id === 'tagModal') closeTagMgr(); };
+
+  /* 事件 */
+  $('#btnNew').onclick = openNew;
+  $('#btnClose').onclick = close;
+  $('#btnCancel').onclick = close;
+  $('#btnSave').onclick = save;
+  $('#modal').onclick = function (e) { if (e.target.id === 'modal') close(); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if ($('#modal').classList.contains('on')) close();
+      if ($('#tagModal').classList.contains('on')) closeTagMgr();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && $('#modal').classList.contains('on')) save();
+  });
+
+  Array.prototype.forEach.call($('#segSort').children, function (b) {
+    b.onclick = function () { S.sort = S.sort === b.getAttribute('data-sort') ? '' : b.getAttribute('data-sort'); load(); };
+  });
+
+  var deb;
+  $('#q').oninput = function () {
+    clearTimeout(deb);
+    var v = this.value;
+    deb = setTimeout(function () { S.q = v.trim(); load(); }, 260);
+  };
+
+  $('#btnExport').onclick = function () {
+    var u = '/api/notes/export?';
+    if (S.q) u += 'q=' + encodeURIComponent(S.q) + '&';
+    if (S.tag) u += 'tag=' + encodeURIComponent(S.tag) + '&';
+    if (S.kind) u += 'source=' + encodeURIComponent(S.kind) + '&';
+    window.location.href = u.replace(/&$/, '');
+  };
+
+  load();
+  setInterval(function () { if (!S.q && !S.kind && !S.tag) load(); }, 30000);
+})();
+</script>
+</body>
+</html>
