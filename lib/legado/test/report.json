@@ -1,0 +1,1425 @@
+{
+ "generatedAt": 1794848090092,
+ "keyword": "凡人修仙传",
+ "history": {
+  "regression": {
+   "total": 41,
+   "passed": 31,
+   "note": "request() header 合并回归"
+  },
+  "baseline": {
+   "total": 41,
+   "passed": 37,
+   "fail": [
+    "云中书库",
+    "📖笔趣网",
+    "笔趣网吧",
+    "🌙 番茄酱"
+   ]
+  },
+  "accepted39": {
+   "total": 41,
+   "passed": 39,
+   "fail": [
+    "云中书库",
+    "笔趣网吧"
+   ]
+  }
+ },
+ "engineUnit": {
+  "total": 14,
+  "passed": 14,
+  "passRate": 1,
+  "cases": [
+   {
+    "label": "模板-key编码",
+    "pass": true,
+    "actual": "/so/%E5%87%A1%E4%BA%BA%20%E4%BC%A0.html?pageNum=2",
+    "expected": "/so/%E5%87%A1%E4%BA%BA%20%E4%BC%A0.html?pageNum=2"
+   },
+   {
+    "label": "模板-算术",
+    "pass": true,
+    "actual": "/search?q=20",
+    "expected": "/search?q=20"
+   },
+   {
+    "label": "模板-老式占位",
+    "pass": true,
+    "actual": "/s/abc/",
+    "expected": "/s/abc/"
+   },
+   {
+    "label": "header-JSON-UA",
+    "pass": true,
+    "actual": "UA",
+    "expected": "UA"
+   },
+   {
+    "label": "header-Python-UA",
+    "pass": true,
+    "actual": "PY",
+    "expected": "PY"
+   },
+   {
+    "label": "header-Cookie合并",
+    "pass": true,
+    "actual": "k=v",
+    "expected": "k=v"
+   },
+   {
+    "label": "header-对象Cookie",
+    "pass": true,
+    "actual": "b=2; a=1",
+    "expected": "b=2; a=1"
+   },
+   {
+    "label": "编码-gbk别名",
+    "pass": true,
+    "actual": "true",
+    "expected": "true"
+   },
+   {
+    "label": "JP-数组取值",
+    "pass": true,
+    "actual": "[\"A\",\"B\"]",
+    "expected": "[\"A\",\"B\"]"
+   },
+   {
+    "label": "JP-递归取值",
+    "pass": true,
+    "actual": "[1,2]",
+    "expected": "[1,2]"
+   },
+   {
+    "label": "取值-CSS文本",
+    "pass": true,
+    "actual": "书",
+    "expected": "书"
+   },
+   {
+    "label": "取值-CSShref",
+    "pass": true,
+    "actual": "/b/1",
+    "expected": "/b/1"
+   },
+   {
+    "label": "pattern-命中",
+    "pass": true,
+    "actual": "true",
+    "expected": "true"
+   },
+   {
+    "label": "pattern-未命中",
+    "pass": true,
+    "actual": "false",
+    "expected": "false"
+   }
+  ]
+ },
+ "summary": {
+  "total": 41,
+  "passed": 36,
+  "passRate": 0.8780487804878049,
+  "tagCoverage": {
+   "jsonPath": {
+    "total": 2,
+    "pass": 2
+   },
+   "js": {
+    "total": 12,
+    "pass": 11
+   },
+   "regex": {
+    "total": 33,
+    "pass": 28
+   }
+  },
+  "transitions": {
+   "fixed": [
+    "📖笔趣网",
+    "笔趣网吧",
+    "🌙 番茄酱"
+   ],
+   "recovered": [
+    "笔趣网吧"
+   ],
+   "newFail": [
+    "🎃梦想家文学🎃",
+    "梦想家文学",
+    "🎃笔趣阁🎃#51",
+    "速读谷"
+   ],
+   "persistent": [
+    "云中书库"
+   ]
+  },
+  "newFail": [
+   "🎃梦想家文学🎃",
+   "梦想家文学",
+   "🎃笔趣阁🎃#51",
+   "速读谷"
+  ],
+  "recovered": [
+   "笔趣网吧"
+  ]
+ },
+ "sources": [
+  {
+   "name": "顶点小说⑤",
+   "url": "http://www.23uswx.la/",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "/modules/article/search.php?q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.23uswx.la/0_804/"
+   },
+   "tocCount": 2514,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2357,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "云中书库",
+   "url": "http://www.yunxs.com/wy-",
+   "group": "✔️2025-11-2去重校验 by-coco,小说,校验超时",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "http://www.yunxs.com/plus/search.php?kwtype=0&searchtype=&q={{key}}",
+   "hitCount": 0,
+   "firstBook": null,
+   "tocCount": 0,
+   "assertions": {
+    "name": false,
+    "author": false,
+    "tocCount": false
+   },
+   "ok": false,
+   "ms": 10001,
+   "error": "任务超时（10s），worker 已回收重建",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   },
+   "failureClass": "外部慢源或重 ajax 规则"
+  },
+  {
+   "name": "🎃七七读书🎃#2",
+   "url": "http://www.77shuku.org#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/modules/article/search.php?searchkey={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.77shuku.info/novel/49764/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 4565,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "笔趣📖",
+   "url": "http://www.biqun.cc",
+   "group": "笔趣📖",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": false
+   },
+   "searchUrl": "http://www.biqun.cc/search/result.html?searchkey={{key}}",
+   "hitCount": 2,
+   "firstBook": {
+    "name": "凡人修仙传：这个红楼世界什么鬼",
+    "author": "作家42e15c",
+    "bookUrl": "http://www.biqun.cc/book/1190/"
+   },
+   "tocCount": 1,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1842,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃梦想家文学🎃",
+   "url": "http://www.mxjtedu.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "search.php?keyWord={{key}}",
+   "hitCount": 0,
+   "firstBook": null,
+   "tocCount": 0,
+   "assertions": {
+    "name": false,
+    "author": false,
+    "tocCount": false
+   },
+   "ok": false,
+   "ms": 643,
+   "error": "read ECONNRESET",
+   "stages": {
+    "search": "read ECONNRESET",
+    "info": "",
+    "toc": ""
+   },
+   "failureClass": "网络瞬时/站点不可达"
+  },
+  {
+   "name": "🎃阴阳代理🎃",
+   "url": "http://www.yinyangdailiren.org#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "http://www.yinyangdailiren.org/s.php?ie=utf-8&q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xyinyangdailiren.com/fanrenxiuxianchuan/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2526,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃来读读破🎃",
+   "url": "https://www.laidudu.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "https://www.laidudu.com/read/search/,<\n\"method\": \"POST\",\n\"body\": \"searchkey={{key}}\"\n>",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.ilaidudu.com/book/48/"
+   },
+   "tocCount": 2467,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2860,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃顶点小说🎃#2",
+   "url": "http://www.23uswx.la#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "/modules/article/search.php?q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.23uswx.la/0_804/"
+   },
+   "tocCount": 2514,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1649,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "📖笔趣网",
+   "url": "http://www.bqgu.cc",
+   "group": "笔趣网",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": false
+   },
+   "searchUrl": "http://www.bqgu.cc/search/result.html?searchkey={{key}}",
+   "hitCount": 2,
+   "firstBook": {
+    "name": "凡人修仙传：这个红楼世界什么鬼",
+    "author": "作家42e15c",
+    "bookUrl": "https://www.bqgu.cc/book/1190/"
+   },
+   "tocCount": 1,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1579,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "玄幻阁🎃",
+   "url": "http://www.xuanyge.org#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "http://www.xuanyge.org/modules/article/search.php?s=7673184438602983814&s={{key}}&searchtype=articlename",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xuanhuange.info/files/article/html/7/7553/"
+   },
+   "tocCount": 2466,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 3378,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃鬼吹灯🎃#3",
+   "url": "http://www.cxzz.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "http://www.cxzz958.com/s.php?ie=utf-8&q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.cxzz958.com/fanrenxiuxianchuan/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1817,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "零点看书-夜明空",
+   "url": "http://23.225.143.232/",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/ar.php?keyWord={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "天地我心",
+    "bookUrl": "http://23.225.143.232/ldks/34341/"
+   },
+   "tocCount": 20,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 833,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃笔趣阁🎃#10",
+   "url": "https://www.tpyyc.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": false
+   },
+   "searchUrl": "{{cookie.removeCookie(source.getKey())}}/search/?searchkey={{key}}",
+   "hitCount": 24,
+   "firstBook": {
+    "name": "凡人修仙传仙界篇",
+    "author": "忘语",
+    "bookUrl": "https://www.tpyyc.com/274717/"
+   },
+   "tocCount": 1412,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 3147,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🌐 未来天王",
+   "url": "http://www.weilaitianwang.org#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "/search.html?name={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.weilaitianwang.cc/52_52420/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2280,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃戊戟武侠🎃",
+   "url": "https://m.ajnnan.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "https://m.ajnnan.com/SearchBook.php?keyword={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://m.wujiwx.info/52_52579/"
+   },
+   "tocCount": 11,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2018,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "笔趣阁#26",
+   "url": "https://www.biqusk.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "https://www.biqusk.com/s.php?q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.biqusk.info/15_15998/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2431,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃玄幻阁",
+   "url": "http://www.xuankuge.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/modules/article/search.php?s={{key}}&searchtype=articlename",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xuanhuange.info/files/article/html/7/7553/"
+   },
+   "tocCount": 2466,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1553,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "梦想家文学",
+   "url": "http://www.mxjtedu.com",
+   "group": "26-3",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "search.php?keyWord={{key}}",
+   "hitCount": 0,
+   "firstBook": null,
+   "tocCount": 0,
+   "assertions": {
+    "name": false,
+    "author": false,
+    "tocCount": false
+   },
+   "ok": false,
+   "ms": 570,
+   "error": "read ECONNRESET",
+   "stages": {
+    "search": "read ECONNRESET",
+    "info": "",
+    "toc": ""
+   },
+   "failureClass": "网络瞬时/站点不可达"
+  },
+  {
+   "name": "🎃笔趣阁🎃#51",
+   "url": "https://www.biquwx.la#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/modules/article/search.php?searchkey={{key}}",
+   "hitCount": 0,
+   "firstBook": null,
+   "tocCount": 0,
+   "assertions": {
+    "name": false,
+    "author": false,
+    "tocCount": false
+   },
+   "ok": false,
+   "ms": 621,
+   "error": "read ECONNRESET",
+   "stages": {
+    "search": "read ECONNRESET",
+    "info": "",
+    "toc": ""
+   },
+   "failureClass": "网络瞬时/站点不可达"
+  },
+  {
+   "name": "👍 笔趣阁",
+   "url": "http://www.biquger.com/",
+   "group": "强迫症书源",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "http://www.biquger.com/modules/article/search.php?searchkey={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.biqugere.net/biquge/11054/"
+   },
+   "tocCount": 2321,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 3880,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "入殓师灵异录 #破冰",
+   "url": "http://www.rulianshi.org/#pb",
+   "group": "30s 成功检验,15s 成功检验,✔️2026-6-4 检验去重（优质 380）",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "http://www.rulianshi.org/s.php?ie=utf-8&q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.rulianshi.cc/fanrenxiuxianchuan/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2205,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃快眼看书🎃#3",
+   "url": "http://www.botaodz.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/modules/article/search.php?searchkey={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xbotaodz.info/8434.html"
+   },
+   "tocCount": 2558,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 3217,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃无极小说🎃#2",
+   "url": "http://wujixiaoshuo.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "https://ajnnan.com/search.html?name={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://wujiwx.info/52_52579/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2827,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🔞色趣阁",
+   "url": "http://www.sequge.com",
+   "group": "色趣阁",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": false
+   },
+   "searchUrl": "http://www.sequge.com/search/result.html?searchkey={{key}}",
+   "hitCount": 2,
+   "firstBook": {
+    "name": "凡人修仙传：这个红楼世界什么鬼",
+    "author": "作家42e15c",
+    "bookUrl": "https://www.sequge.com/book/1190/"
+   },
+   "tocCount": 1,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1436,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "笔趣网吧",
+   "url": "http://www.biquw.com/#pb1101",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": false
+   },
+   "searchUrl": "http://www.biquw.com/modules/article/search.php?action=login&searchkey={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.ibiquw.org/book/700/"
+   },
+   "tocCount": 2287,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 3633,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃永久小说网🎃",
+   "url": "http://www.yjxsw.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "http://www.yjxsw.com/search.php?q={{key}}",
+   "hitCount": 7,
+   "firstBook": {
+    "name": "[武侠]凡人修仙之青岩传",
+    "author": "",
+    "bookUrl": "http://www.yjxsw.com/32/32440/"
+   },
+   "tocCount": 12,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1539,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "速读谷",
+   "url": "https://www.sudugu.org",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/i/sor.aspx?key={{key}}",
+   "hitCount": 0,
+   "firstBook": null,
+   "tocCount": 0,
+   "assertions": {
+    "name": false,
+    "author": false,
+    "tocCount": false
+   },
+   "ok": false,
+   "ms": 523,
+   "error": "read ECONNRESET",
+   "stages": {
+    "search": "read ECONNRESET",
+    "info": "",
+    "toc": ""
+   },
+   "failureClass": "网络瞬时/站点不可达"
+  },
+  {
+   "name": "🎃亿软网🎃#2",
+   "url": "https://www.iyruan.com#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "https://www.iyruan.com/modules/article/search.php?searchkey={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "天地我心",
+    "bookUrl": "http://www.iyruan.info/article/71288.html"
+   },
+   "tocCount": 33,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1963,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "民国奇人",
+   "url": "http://www.minguoqiren.org/pb",
+   "group": "✔️2026-6-4 检验去重（优质 380）",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "http://www.minguoqiren.org/s.php?ie=utf-8&s=000000&q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.minguoqiren.la/xs/1463/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2303,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "玄幻阁网🎃",
+   "url": "http://www.xuanhuange.net#🎃",
+   "group": "魔法",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "modules/article/search.php?s=7673184438602983814&s={{key}}&searchtype=articlename",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xuanhuange.info/files/article/html/7/7553/"
+   },
+   "tocCount": 2466,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2563,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "企鹅阅读",
+   "url": "https://ubook.reader.qq.com/?g_f=4000001",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "https://book.qq.com/book-search/{{key}}",
+   "hitCount": 10,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "https://book.qq.com/book-detail/465030"
+   },
+   "tocCount": 2558,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1988,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "快眼看书",
+   "url": "http://www.xbotaodz.com#",
+   "group": "30s 成功检验,15s 成功检验,✔️2026-6-4 检验去重（优质 380）",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/modules/article/search.php?searchkey={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xbotaodz.info/8434.html"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2590,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "❤️茂鑫小说cn",
+   "url": "http://www.tcmaoxin.cn",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": false
+   },
+   "searchUrl": "http://www.tcmaoxin.org/search.php?keyWord={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.ucmaoxin.com/yuedu/21/21123/"
+   },
+   "tocCount": 20,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2048,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "❤️入殓师cn",
+   "url": "http://www.rulianshi.cn",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "http://www.rulianshi.org/s.php?ie=utf-8&q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.rulianshi.cc/fanrenxiuxianchuan/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1456,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🎃何以笙箫默🎃",
+   "url": "http://www.yetianlian.net#🎃",
+   "group": "☃☃️1124",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": false
+   },
+   "searchUrl": "http://www.yetianlian.net/s.php?ie=utf-8&q={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xyetianlian.com/yt162/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2329,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "QQ阅读",
+   "url": "bbnnfgh",
+   "group": "仓库",
+   "tags": {
+    "jsonPath": true,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "https://newopensearch.reader.qq.com/wechat?keyword={{key}}&start={{page-1}}&end=19",
+   "hitCount": 20,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "https://bookshelf.html5.qq.com/qbread/api/novel/intro-info?bookid=1100465030"
+   },
+   "tocCount": 2558,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 5821,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "🌙 番茄酱",
+   "url": "番茄小说-hide#HD",
+   "group": "-(02)✅常用",
+   "tags": {
+    "jsonPath": true,
+    "js": true,
+    "regex": true
+   },
+   "searchUrl": "@js:\nif (/\\d{19}/.test(key)) {\n    buildRequest(`${backend}/fq/detail?book_id=${key}`);\n} else {\n    `https://novel.snssdk.com/api/novel/channel/homepage/search/search/v2/?device_platform=android&parent_enterfrom=novel_channel_search.tab.&offset={{(page-1)*10}}&aid=1967&q=${key}`;\n}",
+   "hitCount": 7,
+   "firstBook": {
+    "name": "凡人修仙传：逆袭成王",
+    "author": "文总",
+    "bookUrl": "data:;base64,NzUzOTc4Mzg5NTkxOTYyNzI4OQ==,{\"type\":\"skybook\"}"
+   },
+   "tocCount": 328,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 1762,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "bak㊣飞卢小说 #破冰",
+   "url": "https://b.faloo.com#♤pb",
+   "group": "有效书源",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "https://b.faloo.com/l/0/1.html?t=1&k={{key}},{\n  \"charset\": \"gbk\"\n}",
+   "hitCount": 27,
+   "firstBook": {
+    "name": "三体：卧底ETO再不收网成统帅",
+    "author": "灵异老司机",
+    "bookUrl": "https://b.faloo.com/1275146.html"
+   },
+   "tocCount": 51,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 554,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "影书",
+   "url": "http://www.yingsx.com#",
+   "group": "30s 成功检验,15s 成功检验,✔️2026-6-4 检验去重（优质 380）",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": false
+   },
+   "searchUrl": "http://www.yingsx.com/cse/search?q={{key}}&s=,{\n  \"charset\": \"utf-8\"\n}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "https://www.yingsx.com/5_5569/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 2497,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "笔趣阁🎃#11",
+   "url": "http://www.xbiquwx.la#🎃",
+   "group": "",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "http://www.xbiquwx.la/modules/article/search.php?searchkey={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.xbiquwk.com/10_10240/"
+   },
+   "tocCount": 2467,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 3111,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  },
+  {
+   "name": "笔趣阁#21",
+   "url": "http://www.ibiquzw.org#🎃",
+   "group": "第三方",
+   "tags": {
+    "jsonPath": false,
+    "js": false,
+    "regex": true
+   },
+   "searchUrl": "/search.html?name={{key}}",
+   "hitCount": 30,
+   "firstBook": {
+    "name": "凡人修仙传",
+    "author": "忘语",
+    "bookUrl": "http://www.biqutu.info/78_78740/"
+   },
+   "tocCount": 2565,
+   "assertions": {
+    "name": true,
+    "author": true,
+    "tocCount": true
+   },
+   "ok": true,
+   "ms": 3426,
+   "error": "",
+   "stages": {
+    "search": "",
+    "info": "",
+    "toc": ""
+   }
+  }
+ ]
+}

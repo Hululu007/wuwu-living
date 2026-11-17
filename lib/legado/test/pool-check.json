@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-11-16T13:01:41.213Z",
+  "jitter": {
+    "expectedMs": 50,
+    "samples": 75,
+    "meanMs": 51.9,
+    "p95Ms": 58,
+    "p99Ms": 90,
+    "maxMs": 90,
+    "passed": true
+  },
+  "concurrency": {
+    "submitted": 20,
+    "poolSize": 4,
+    "maxBusy": 4,
+    "queueMax": 16,
+    "passed": true
+  },
+  "timeout": {
+    "rejected": true,
+    "reason": "任务超时（10s），worker 已回收重建",
+    "elapsedMs": 10005,
+    "workerRebuilt": true,
+    "nextTaskOk": true,
+    "passed": true
+  },
+  "searchOk": 20,
+  "pressure": {
+    "submitted": 50,
+    "concurrency": 4,
+    "firstWallMs": 496,
+    "queueWait": {
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "engine": {
+      "p50": 521,
+      "p95": 1368,
+      "max": 2306
+    },
+    "wall": {
+      "p50": 521,
+      "p95": 1391,
+      "max": 2307
+    },
+    "success": 50,
+    "wallP95RatioToFirst": 2.8,
+    "first10WallMedianMs": 519,
+    "last10WallMedianMs": 492,
+    "passed": true,
+    "latencyTrend": true
+  }
+}

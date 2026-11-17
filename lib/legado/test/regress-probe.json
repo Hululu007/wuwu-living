@@ -1,0 +1,112 @@
+{
+  "generatedAt": "2026-11-17",
+  "keyword": "凡人修仙传",
+  "baseline": {
+    "passed": 39,
+    "total": 41,
+    "knownFail": ["云中书库", "笔趣网吧"],
+    "note": "39/41 逐源明细未在 runtime/regress-history.json 或 lib/legado/test/ 中找到持久化快照；按上一轮验收记录，仅上述两源失败。"
+  },
+  "directProbe": [
+    {
+      "name": "🎃梦想家文学🎃",
+      "host": "www.mxjtedu.com",
+      "url": "http://www.mxjtedu.com#🎃",
+      "tag": "regex",
+      "stage": "search",
+      "baselineStatus": "pass",
+      "currentStatus": "fail",
+      "engineRuns": [
+        {"run": 1, "ok": false, "ms": 602, "error": "read ECONNRESET"},
+        {"run": 2, "ok": false, "ms": 659, "error": "read ECONNRESET"},
+        {"run": 3, "ok": false, "ms": 643, "error": "read ECONNRESET"}
+      ],
+      "curlRuns": [
+        {"run": 1, "status": 0, "timeSec": 0.21785, "error": "curl: (56) Recv failure: Connection reset by peer"},
+        {"run": 2, "status": 0, "timeSec": 0.189712, "error": "curl: (56) Recv failure: Connection reset by peer"},
+        {"run": 3, "status": 0, "timeSec": 0.225895, "error": "curl: (56) Recv failure: Connection reset by peer"}
+      ],
+      "conclusion": "网络/站点侧连接被重置；引擎未进入规则解析，不判为选择器或取值回归。"
+    },
+    {
+      "name": "梦想家文学",
+      "host": "www.mxjtedu.com",
+      "url": "http://www.mxjtedu.com",
+      "tag": "regex",
+      "stage": "search",
+      "baselineStatus": "pass",
+      "currentStatus": "fail",
+      "engineRuns": [
+        {"run": 1, "ok": false, "ms": 670, "error": "read ECONNRESET"},
+        {"run": 2, "ok": false, "ms": 555, "error": "read ECONNRESET"},
+        {"run": 3, "ok": false, "ms": 647, "error": "read ECONNRESET"}
+      ],
+      "curlRuns": [
+        {"run": 1, "status": 0, "timeSec": 0.21785, "error": "curl: (56) Recv failure: Connection reset by peer"},
+        {"run": 2, "status": 0, "timeSec": 0.189712, "error": "curl: (56) Recv failure: Connection reset by peer"},
+        {"run": 3, "status": 0, "timeSec": 0.225895, "error": "curl: (56) Recv failure: Connection reset by peer"}
+      ],
+      "conclusion": "同 host 的第二个变体；curl 绕过 Node 直连仍 reset，不判为引擎回归。"
+    },
+    {
+      "name": "🎃笔趣阁🎃#51",
+      "host": "www.biquwx.la",
+      "url": "https://www.biquwx.la#🎃",
+      "tag": "regex",
+      "stage": "search",
+      "baselineStatus": "pass",
+      "currentStatus": "fail",
+      "engineRuns": [
+        {"run": 1, "ok": false, "ms": 545, "error": "read ECONNRESET"},
+        {"run": 2, "ok": false, "ms": 599, "error": "read ECONNRESET"},
+        {"run": 3, "ok": false, "ms": 571, "error": "read ECONNRESET"}
+      ],
+      "curlRuns": [
+        {"run": 1, "status": 0, "timeSec": 0.329874, "error": "curl: (35) Recv failure: Connection reset by peer"},
+        {"run": 2, "status": 0, "timeSec": 0.235219, "error": "curl: (35) Recv failure: Connection reset by peer"},
+        {"run": 3, "status": 0, "timeSec": 0.194001, "error": "curl: (35) Recv failure: Connection reset by peer"}
+      ],
+      "conclusion": "TLS/连接阶段 reset；Node 与 curl 结果一致，不判为规则解释器回归。"
+    },
+    {
+      "name": "速读谷",
+      "host": "www.sudugu.org",
+      "url": "https://www.sudugu.org",
+      "tag": "regex",
+      "stage": "search",
+      "baselineStatus": "pass",
+      "currentStatus": "fail",
+      "engineRuns": [
+        {"run": 1, "ok": false, "ms": 600, "error": "read ECONNRESET"},
+        {"run": 2, "ok": false, "ms": 541, "error": "read ECONNRESET"},
+        {"run": 3, "ok": false, "ms": 528, "error": "read ECONNRESET"}
+      ],
+      "curlRuns": [
+        {"run": 1, "status": 0, "timeSec": 0.192746, "error": "curl: (35) Recv failure: Connection reset by peer"},
+        {"run": 2, "status": 0, "timeSec": 0.184428, "error": "curl: (35) Recv failure: Connection reset by peer"},
+        {"run": 3, "status": 0, "timeSec": 0.18826, "error": "curl: (35) Recv failure: Connection reset by peer"}
+      ],
+      "conclusion": "TLS/连接阶段 reset；Node 与 curl 结果一致，不判为规则解释器回归。"
+    }
+  ],
+  "persistentFail": [
+    {
+      "name": "云中书库",
+      "host": "www.yunxs.com",
+      "url": "http://www.yunxs.com/wy-",
+      "tags": {"js": true, "regex": true},
+      "stage": "search",
+      "error": "任务超时（10s），worker 已回收重建",
+      "ms": 10001,
+      "conclusion": "已知重 ajax 规则/外部慢源；39 基线即失败，本轮持续失败。"
+    }
+  ],
+  "recovered": [
+    {
+      "name": "笔趣网吧",
+      "host": "www.biquw.com",
+      "url": "http://www.biquw.com/#pb1101",
+      "note": "39 基线失败；本轮套件通过，命中 30、目录 2287。"
+    }
+  ]
+}

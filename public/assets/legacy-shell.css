@@ -57,6 +57,9 @@
 }
 .ww-bar .ww-home:hover{color:var(--ww-ink,#efe9df);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
 .ww-bar .ww-home svg{width:14px;height:14px;opacity:.8}
+/* 嵌入态（iframe 被舞台壳打开）：顶栏返回入口隐藏，舞台头那个才是唯一入口；双保险，按栏标记兜底 */
+html[data-embedded] .ww-home,
+.ww-bar[data-embedded] .ww-home{display:none}
 .ww-bar .ww-dot{
   width:7px;height:7px;border-radius:50%;background:var(--ww-a);
   box-shadow:0 0 0 3px var(--ww-soft),0 0 12px var(--ww-edge);

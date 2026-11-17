@@ -40,6 +40,26 @@
   .cell .m .kind{color:var(--a)}
   .cell.ep{display:flex;gap:8px}
   .cell.ep img{width:34px;height:46px;border-radius:5px;object-fit:cover;flex:0 0 auto;background:rgba(255,255,255,.06)}
+  .cell .t-link{display:block;text-decoration:none}
+  .cell .ops{display:flex;gap:5px;margin-top:6px}
+  .cell .ops .btn{flex:1;padding:4px 7px;font-size:10px}
+  .ep-ops{flex:0 0 auto;display:flex;flex-direction:column;gap:5px;justify-content:center}
+  .skipped-tag{font-size:9.5px;color:var(--warn)}
+
+  /* 弹层正文与撤销条 */
+  .compose{display:flex;flex-direction:column;gap:12px}
+  .compose .s{font-size:12.5px;color:var(--muted);line-height:1.7}
+  .undo-bar{
+    position:fixed;left:50%;bottom:26px;z-index:390;transform:translate(-50%,10px);
+    display:flex;align-items:center;gap:14px;background:rgba(18,20,24,.96);
+    border:1px solid var(--edge);border-radius:10px;padding:11px 16px;
+    box-shadow:0 18px 44px -18px rgba(0,0,0,.85);opacity:0;visibility:hidden;transition:.22s;
+    font-size:12.5px;color:var(--ink);
+  }
+  .undo-bar.on{opacity:1;visibility:visible;transform:translate(-50%,0)}
+  .undo-bar .u-msg{color:var(--muted)}
+  .undo-bar .u-count{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .undo-bar .btn{padding:6px 12px}
   .day-empty{font-size:10.5px;color:var(--faint);opacity:.6}
 
   /* 番剧卡片 */
@@ -67,7 +87,11 @@
   .track-card .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
   .track-card .count{margin-left:auto;font-family:var(--serif);color:var(--a);font-size:13px}
   .track-card .src{font-size:10.5px;color:var(--faint);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .track-card .src-vod{color:var(--a)}
   .track-card .ops{display:flex;gap:6px;margin-top:10px}
+  .pending-tag{background:var(--warn);color:#111;border-radius:5px;font-size:10.5px;font-weight:600;padding:1px 7px;margin-left:6px}
+  .track-thumb{width:44px;height:62px;border-radius:6px;object-fit:cover;float:left;margin:0 10px 6px 0}
+  .src-tag{font-size:10.5px;color:var(--faint);border:1px solid var(--line);border-radius:5px;padding:0 6px}
   .row2{display:flex;gap:9px;flex-wrap:wrap}
   .row2 > *{flex:1;min-width:150px}
   .unread-badge{background:var(--danger);color:#fff;border-radius:999px;font-size:10px;padding:1px 7px;margin-left:4px}
@@ -222,12 +246,38 @@
   </div>
 </div>
 
+<!-- 二次确认弹层（不使用 confirm()） -->
+<div class="modal" id="confirmModal" aria-hidden="true">
+  <div class="sheet">
+    <div class="sheet-h">
+      <h3 id="cfTitle">确认操作</h3>
+      <button class="btn ghost icon x" id="cfClose" type="button" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+      </button>
+    </div>
+    <div class="compose">
+      <div class="s" id="cfBody"></div>
+      <div class="row2" style="justify-content:flex-end">
+        <button class="btn ghost" id="cfCancel" type="button">算了</button>
+        <button class="btn danger" id="cfOk" type="button">确认删除</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 10 秒撤销条 -->
+<div class="undo-bar" id="undoBar" aria-hidden="true">
+  <span class="u-msg" id="undoMsg">已删除</span>
+  <button class="btn primary" id="undoBtn" type="button">撤销</button>
+  <span class="u-count" id="undoCount"></span>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 (function () {
   'use strict';
-  var S = { data: null, editing: null, seenPosted: false };
+  var S = { data: null, editing: null, seenPosted: false, undo: null };
   var $ = function (s, el) { return (el || document).querySelector(s); };
 
   function toast(msg, err) {
@@ -267,6 +317,112 @@
     }).then(function (r) { return r.json(); });
   }
 
+  /* ── 二次确认弹层（Promise，不使用 confirm()） ── */
+  var cfResolver = null;
+  function openConfirm(opts) {
+    return new Promise(function (resolve) {
+      cfResolver = resolve;
+      $('#cfTitle').textContent = opts.title || '确认操作';
+      $('#cfBody').textContent = opts.body || '';
+      $('#cfOk').textContent = opts.okText || '确认';
+      $('#confirmModal').classList.add('on');
+      $('#confirmModal').setAttribute('aria-hidden', 'false');
+    });
+  }
+  function closeConfirm(ok) {
+    $('#confirmModal').classList.remove('on');
+    $('#confirmModal').setAttribute('aria-hidden', 'true');
+    if (cfResolver) { var r = cfResolver; cfResolver = null; r(!!ok); }
+  }
+  $('#cfOk').onclick = function () { closeConfirm(true); };
+  $('#cfCancel').onclick = function () { closeConfirm(false); };
+  $('#cfClose').onclick = function () { closeConfirm(false); };
+  $('#confirmModal').onclick = function (e) { if (e.target.id === 'confirmModal') closeConfirm(false); };
+
+  /* ── 10 秒撤销：服务端留有快照，撤销真正恢复数据与视图 ── */
+  var UNDO_SECONDS = 10;
+  function clearUndo() {
+    if (S.undo) { clearInterval(S.undo.timer); S.undo.timer = null; S.undo = null; }
+    $('#undoBar').classList.remove('on');
+    $('#undoBar').setAttribute('aria-hidden', 'true');
+  }
+  function showUndo(kind, id, label) {
+    clearUndo();
+    var remain = UNDO_SECONDS;
+    $('#undoMsg').textContent = label;
+    $('#undoCount').textContent = remain + ' 秒内可撤销';
+    $('#undoBar').classList.add('on');
+    $('#undoBar').setAttribute('aria-hidden', 'false');
+    var undo = { kind: kind, id: id, remain: remain, timer: null };
+    undo.timer = setInterval(function () {
+      undo.remain -= 1;
+      if (undo.remain <= 0) { clearUndo(); return; }
+      $('#undoCount').textContent = undo.remain + ' 秒内可撤销';
+    }, 1000);
+    S.undo = undo;
+  }
+  $('#undoBtn').onclick = function () {
+    var u = S.undo;
+    if (!u) return;
+    var url = u.kind === 'feed' ? '/api/calendar/feed/restore' : '/api/calendar/track/restore';
+    post(url, { id: u.id })
+      .then(function (r) {
+        if (r.ok) { toast('已撤销，记录恢复'); clearUndo(); load(); }
+        else toast(r.message || '撤销失败', true);
+      })
+      .catch(function () { toast('撤销请求失败', true); });
+  };
+
+  /* ── 删除 / 跳过动作 ── */
+  function removeTrack(id, name) {
+    openConfirm({
+      title: '删除这条追更',
+      body: '确定删除「' + name + '」？删除后 10 秒内可以撤销。',
+      okText: '删除',
+    }).then(function (ok) {
+      if (!ok) return;
+      post('/api/calendar/track/remove', { id: id })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.message || '删除失败');
+          showUndo('track', id, '已删除追更「' + name + '」');
+          load();
+        })
+        .catch(function (e) { toast(e.message, true); });
+    });
+  }
+  function removeFeed(id, name) {
+    openConfirm({
+      title: '删除这个订阅源',
+      body: '确定删除「' + name + '」？删除后 10 秒内可以撤销。',
+      okText: '删除',
+    }).then(function (ok) {
+      if (!ok) return;
+      post('/api/calendar/feed/remove', { id: id })
+        .then(function (r) {
+          if (!r.ok) throw new Error(r.message || '删除失败');
+          showUndo('feed', id, '已删除订阅源「' + name + '」');
+          load();
+        })
+        .catch(function (e) { toast(e.message, true); });
+    });
+  }
+  function skipTrack(id, name) {
+    post('/api/calendar/track/skip', { id: id })
+      .then(function (r) {
+        if (r.ok) { toast('已跳过本期，下一期自动回来'); load(); }
+        else toast(r.message || '操作失败', true);
+      })
+      .catch(function () { toast('请求失败', true); });
+  }
+  function skipEpisode(id) {
+    post('/api/calendar/episode/skip', { id: id })
+      .then(function (r) {
+        if (r.ok) { toast('本期已跳过'); load(); }
+        else toast(r.message || '操作失败', true);
+      })
+      .catch(function () { toast('请求失败', true); });
+  }
+
   /* ── 渲染 ── */
 
   function renderHero() {
@@ -292,17 +448,23 @@
   }
 
   function cellTrack(t) {
-    return '<a class="cell" href="' + esc(t.sourceUrl || '#') + '" target="_blank" rel="noopener">' +
-      '<div class="t">' + esc(t.title) + '</div>' +
+    return '<div class="cell">' +
+      '<a class="t t-link" href="' + esc(t.sourceUrl || '#') + '" target="_blank" rel="noopener">' + esc(t.title) + '</a>' +
       '<div class="m"><span class="kind">' + esc(t.kind) + '</span><span>' + esc(t.time || '') + '</span>' +
-      '<span data-next="' + t.nextAt + '">' + esc(t.inText) + '</span></div></a>';
+      '<span data-next="' + t.nextAt + '">' + esc(t.inText) + '</span></div>' +
+      '<div class="ops">' +
+      '<button class="btn ghost sm" type="button" data-week-skip-track="' + t.id + '" data-name="' + esc(t.title) + '">跳过本期</button>' +
+      '<button class="btn ghost sm danger" type="button" data-week-remove-track="' + t.id + '" data-name="' + esc(t.title) + '">删除</button>' +
+      '</div></div>';
   }
 
   function cellEp(ep) {
-    return '<a class="cell ep" href="' + esc(ep.url || '#') + '" target="_blank" rel="noopener">' +
+    return '<div class="cell ep">' +
       (ep.cover ? '<img src="' + esc(ep.cover) + '" alt="">' : '') +
       '<div style="min-width:0"><div class="t">' + esc(ep.title) + '</div>' +
-      '<div class="m"><span>' + esc(ep.pubTime || '') + '</span><span>' + esc(ep.episode || '') + '</span></div></div></a>';
+      '<div class="m"><span>' + esc(ep.pubTime || '') + '</span><span>' + esc(ep.episode || '') + '</span></div></div>' +
+      '<div class="ep-ops"><button class="btn ghost sm" type="button" data-week-skip-ep="' + ep.id + '">跳过本期</button></div>' +
+      '</div>';
   }
 
   function renderWeek() {
@@ -317,6 +479,17 @@
         '<div class="day-h"><b>周' + esc(day.label) + '</b>' +
         (day.isToday ? '<span class="today-tag">今天</span>' : '') + '</div>' + cells + '</div>';
     }).join('');
+
+    Array.prototype.forEach.call(el.querySelectorAll('[data-week-skip-track]'), function (b) {
+      b.onclick = function () { skipTrack(b.getAttribute('data-week-skip-track'), b.getAttribute('data-name') || ''); };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-week-remove-track]'), function (b) {
+      b.onclick = function () { removeTrack(b.getAttribute('data-week-remove-track'), b.getAttribute('data-name') || ''); };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('[data-week-skip-ep]'), function (b) {
+      b.onclick = function () { skipEpisode(b.getAttribute('data-week-skip-ep')); };
+    });
+
     var total = d.week.reduce(function (s, x) { return s + x.tracks.length + x.episodes.length; }, 0);
     $('#weekCount').textContent = total + ' 条排期';
   }
@@ -383,7 +556,7 @@
         '<div class="feed-head"><b>' + esc(f.name) + '</b>' + feedStatus(f) +
         '<span class="url">' + esc(f.url) + '</span>' +
         '<span class="ops"><button class="btn ghost sm" data-refresh="' + f.id + '">刷新</button>' +
-        '<button class="btn ghost sm danger" data-remove-feed="' + f.id + '">删除</button></span></div>' +
+        '<button class="btn ghost sm danger" data-remove-feed="' + f.id + '" data-name="' + esc(f.name || f.url) + '">删除</button></span></div>' +
         fail +
         '<div class="feed-items">' + (items || '<div class="day-empty">暂无条目</div>') + '</div></div>';
     }).join('');
@@ -395,12 +568,7 @@
       };
     });
     Array.prototype.forEach.call($('#feeds').querySelectorAll('[data-remove-feed]'), function (b) {
-      b.onclick = function () {
-        if (!confirm('删掉这个订阅源？')) return;
-        post('/api/calendar/feed/remove', { id: b.getAttribute('data-remove-feed') })
-          .then(function (r) { if (r.ok) { toast('已删除'); load(); } else toast(r.message || '删除失败', true); })
-          .catch(function () { toast('删除失败', true); });
-      };
+      b.onclick = function () { removeFeed(b.getAttribute('data-remove-feed'), b.getAttribute('data-name') || ''); };
     });
   }
 
@@ -413,16 +581,26 @@
       return;
     }
     $('#tracks').className = 'grid c2';
+    var SRC_LABEL = { vod: '视频房', bangumi: '番剧表', manual: '手动' };
     $('#tracks').innerHTML = d.tracks.map(function (t) {
+      var srcLabel = SRC_LABEL[t.source] || '手动';
+      var cover = t.cover ? '<img class="track-thumb" referrerpolicy="no-referrer" src="' + esc(t.cover) + '">' : '';
+      var srcLink = t.sourceUrl
+        ? '<a class="src ' + (t.source === 'vod' ? 'src-vod' : '') + '" href="' + esc(t.sourceUrl) + '" target="_blank" rel="noopener">' +
+          (t.source === 'vod' ? '去视频房：' + esc(t.sourceUrl) : esc(t.sourceUrl)) + '</a>'
+        : '<div class="src">无来源链接</div>';
       return '<div class="card track-card">' +
-        '<div class="t">' + esc(t.name) + '</div>' +
+        cover +
+        '<div class="t">' + esc(t.name) + (t.skipped ? ' <span class="skipped-tag">本期已跳过</span>' : '') +
+        (t.pending ? ' <span class="pending-tag">待确认更新时间</span>' : '') + '</div>' +
         '<div class="meta"><span class="tag">' + esc(t.kind) + '</span>' +
+        '<span class="src-tag">' + esc(srcLabel) + '</span>' +
         '<span class="chip">' + esc(t.ruleLabel) + '</span>' +
         (t.progress ? '<span class="chip">' + esc(t.progress) + '</span>' : '') +
         '<span class="count" data-next="' + t.nextAt + '">' + esc(t.inText) + '</span></div>' +
-        (t.sourceUrl ? '<a class="src" href="' + esc(t.sourceUrl) + '" target="_blank" rel="noopener">' + esc(t.sourceUrl) + '</a>' : '<div class="src">无来源链接</div>') +
+        srcLink +
         '<div class="ops"><button class="btn ghost sm" data-edit="' + t.id + '">编辑</button>' +
-        '<button class="btn ghost sm danger" data-remove-track="' + t.id + '">删除</button></div></div>';
+        '<button class="btn ghost sm danger" data-remove-track="' + t.id + '" data-name="' + esc(t.name) + '">删除</button></div></div>';
     }).join('');
     Array.prototype.forEach.call($('#tracks').querySelectorAll('[data-edit]'), function (b) {
       b.onclick = function () {
@@ -433,12 +611,7 @@
       };
     });
     Array.prototype.forEach.call($('#tracks').querySelectorAll('[data-remove-track]'), function (b) {
-      b.onclick = function () {
-        if (!confirm('删掉这条追更？')) return;
-        post('/api/calendar/track/remove', { id: b.getAttribute('data-remove-track') })
-          .then(function (r) { if (r.ok) { toast('已删除'); load(); } else toast(r.message || '删除失败', true); })
-          .catch(function () { toast('删除失败', true); });
-      };
+      b.onclick = function () { removeTrack(b.getAttribute('data-remove-track'), b.getAttribute('data-name') || ''); };
     });
   }
 
@@ -604,7 +777,7 @@
   };
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeFeed(); closeTrack(); }
+    if (e.key === 'Escape') { closeFeed(); closeTrack(); closeConfirm(false); }
   });
 
   load();

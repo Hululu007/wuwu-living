@@ -24,12 +24,29 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
-import { searchAllSources, getSourceStats, ensureSourceCache, groupBooks, groupKeyOf } from './lib/book_source_search.mjs';
+import { searchAllSources, getSourceStats, ensureSourceCache, groupBooks, groupKeyOf, getSourceByUrl, awaitSourceCache } from './lib/book_source_search.mjs';
+import { searchdHealth, healthCacheSnapshot, searchViaSearchd, searchdBase } from './lib/book_searchd.mjs';
+import { raceOpenViaSearchd, chapterContentViaSearchd } from './lib/book_open_searchd.mjs';
+import { bookInfo as engineBookInfo, chapterList as engineChapterList, chapterContent as engineChapterContent, warmup as engineWarmup } from './lib/legado/index.mjs';
 import { READER_SEARCH_FACTS, probeReaderHealth, probeRoute } from './lib/reader_api.mjs';
-import { loadRooms, roomRoutes, roomSummaries, ROOM_LIST } from './lib/rooms.mjs';
+import { rankSources, remainingBudget, recordOutcome, shouldSwitchFor } from './lib/book_sched.mjs';
+import { raceOpen } from './lib/book_race.mjs';
+import { warmOnSearchHits } from './lib/book_warm.mjs';
+import { loadRooms, roomRoutes, roomSummaries, roomsReady, ROOM_LIST } from './lib/rooms.mjs';
 import { homeSummary, homeTodos } from './lib/home.mjs';
+import { readShelf, addToShelf, removeFromShelf, touchShelfProgress } from './lib/book_shelf.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
+
+// 进程级兜底：规则引擎个别源在请求构造/定时器里可能抛异常，记录后留在进程内，绝不让单源异常打挂主线程。
+process.on('uncaughtException', (err) => {
+  try { fs.appendFileSync('/tmp/wuwu-book-search.log', `[${new Date().toISOString()}] uncaught: ${err && err.message ? err.message : err}\n`); } catch { /* ignore */ }
+});
+process.on('unhandledRejection', (err) => {
+  try { fs.appendFileSync('/tmp/wuwu-book-search.log', `[${new Date().toISOString()}] unhandled rejection: ${err && err.message ? err.message : err}\n`); } catch { /* ignore */ }
+});
+
+const bootStartedAt = Date.now();
 const PORT = Number(process.env.PORT || 8890);
 const LAN = process.argv.includes('--lan');
 const BIND = process.env.BIND || (LAN ? '0.0.0.0' : '127.0.0.1');
@@ -37,6 +54,9 @@ const BIND = process.env.BIND || (LAN ? '0.0.0.0' : '127.0.0.1');
 const CONFIG_FILE = path.join(ROOT, 'config', 'apps.json');
 const PAGE_FILE = path.join(ROOT, 'public', '五五客厅.html');
 const BOOK_FILE = path.join(ROOT, 'public', '书房.html');
+// 静态页启动期读入内存，请求处理路径上不再做同步文件读。
+const PAGE_HTML = fs.readFileSync(PAGE_FILE, 'utf8');
+const BOOK_HTML = fs.readFileSync(BOOK_FILE, 'utf8');
 const ACTION_LOG = '/tmp/wuwu-living-actions.log';
 
 const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
@@ -53,6 +73,8 @@ const REWRITE = {
 
 const busy = new Map();
 const extraCache = new Map();
+const staticPageCache = new Map();
+const STATIC_PAGE_TTL = 5000;
 const bookCache = { t: 0, data: null, pending: null };
 const searchJobs = new Map();
 let searchJobSeq = 0;
@@ -67,6 +89,12 @@ function sendJson(res, code, obj) {
     'content-length': Buffer.byteLength(body),
   });
   res.end(body);
+}
+
+function roomBootPlaceholder(roomId) {
+  const room = ROOM_LIST.find((r) => r.id === roomId);
+  const name = room?.name || roomId;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${name} · 加载中</title><style>body{margin:0;min-height:100vh;background:#151311;color:#d8d2c7;display:grid;place-items:center;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif}main{text-align:center;padding:24px}h1{font-size:18px;font-weight:600;margin:0 0 10px}p{font-size:13px;color:#8b8b8b;margin:0}</style></head><body><main><h1>${name}</h1><p>房间加载中，稍后再试…</p></main></body></html>`;
 }
 
 function sendHtml(res, html, code = 200) {
@@ -118,6 +146,26 @@ function logLine(msg) {
   } catch {}
 }
 
+// 引擎慢调用告警：任一阶段 >3s 记录源名/阶段/结果/耗时，异常不吞。
+async function timedEngine(stage, source, fn) {
+  const t0 = Date.now();
+  let res;
+  try {
+    res = await fn();
+  } catch (error) {
+    const ms = Date.now() - t0;
+    if (ms > 3000) {
+      logLine(`慢调用[${stage}] ${source?.name || source?.url || ''} 异常 ${ms}ms: ${error?.message || error}`);
+    }
+    throw error;
+  }
+  const ms = res?.ms != null ? res.ms : Date.now() - t0;
+  if (ms > 3000) {
+    logLine(`慢调用[${stage}] ${source?.name || source?.url || ''} ${res?.ok ? 'OK' : 'FAIL'} ${ms}ms${res?.error ? ' ' + res.error : ''}`);
+  }
+  return res;
+}
+
 async function getJson(url, ms = 3000) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), ms);
@@ -162,6 +210,8 @@ function runScript(app, arg) {
   }
   try {
     const env = { ...process.env, ...(app.env || {}) };
+    env.PATH = '/usr/local/bin:' + (env.PATH || process.env.PATH || '');
+    delete env.PORT; // hub 自身监听端口不应泄漏给子 Web 脚本，避免子进程抢绑 8890
     const child = spawn('/bin/bash', [script, arg], {
       cwd: app.dir,
       detached: true,
@@ -169,6 +219,9 @@ function runScript(app, arg) {
       env,
     });
     child.unref();
+    child.on('exit', (code) => {
+      if (code !== 0 && code !== null) logLine(`spawn ${app.script} ${arg} exited code ${code}`);
+    });
     logLine(`spawn ${app.script} ${arg} (pid ${child.pid})`);
     return { ok: true };
   } catch (e) {
@@ -327,60 +380,105 @@ async function fetchText(url, opts = {}, ms = 15000) {
   return await r.text();
 }
 
+/* ───────────── 番茄热榜（推荐页数据） ───────────── */
+
+const FANQIE_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
+const FANQIE_TTL_MS = 10 * 60 * 1000;
+const FANQIE_CACHE_FILE = path.join(ROOT, 'runtime', 'fanqie_recommend.json');
+const fanqieCache = { t: 0, items: [], updatedAt: 0 };
+let fanqiePending = null;
+
+async function fanqieGetJson(url) {
+  const res = await fetch(url, {
+    headers: { 'user-agent': FANQIE_UA, accept: 'application/json, text/plain, */*' },
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error(`番茄接口 HTTP ${res.status}`);
+  return res.json();
+}
+
+function fanqieBook(raw, tag) {
+  const bookId = String(raw.bookId || raw.book_id || '');
+  const name = cleanText(raw.bookName || raw.book_name || '');
+  if (!bookId || !name) return null;
+  return {
+    id: bookId,
+    name,
+    author: cleanText(raw.author || '') || '佚名',
+    abstract: cleanText(raw.abstract || raw.book_abstract || '').slice(0, 160),
+    cover: cleanText(raw.thumbUri || raw.thumb_url || raw.cover || ''),
+    url: `https://fanqienovel.com/page/${bookId}`,
+    tag,
+  };
+}
+
+function readFanqieFile() {
+  try {
+    const data = JSON.parse(fs.readFileSync(FANQIE_CACHE_FILE, 'utf8'));
+    return { items: Array.isArray(data.items) ? data.items : [], updatedAt: Number(data.updatedAt) || 0 };
+  } catch {
+    return { items: [], updatedAt: 0 };
+  }
+}
+
+async function fanqieRecommend(force = false) {
+  if (!force && fanqieCache.items.length && Date.now() - fanqieCache.t < FANQIE_TTL_MS) {
+    return { items: fanqieCache.items, updatedAt: fanqieCache.updatedAt, stale: false };
+  }
+  if (fanqiePending) return fanqiePending;
+  fanqiePending = (async () => {
+    const urls = [
+      ['https://fanqienovel.com/api/rank/recommend/list', '番茄推荐'],
+      ['https://fanqienovel.com/api/rank/list?rank_type=1', '人气榜'],
+    ];
+    const lists = await Promise.all(urls.map(async ([url, tag]) => {
+      try {
+        const json = await fanqieGetJson(url);
+        const data = (json && json.data) || {};
+        const list = Array.isArray(data.list) ? data.list : [];
+        return list.map((x) => fanqieBook(x, tag)).filter(Boolean);
+      } catch (e) {
+        logLine('fanqie list failed: ' + (e.message || e));
+        return [];
+      }
+    }));
+    const seen = new Set();
+    const items = [];
+    for (const list of lists) {
+      for (const book of list) {
+        const key = book.id || `${book.name}|${book.author}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        items.push(book);
+      }
+    }
+    if (items.length) {
+      fanqieCache.t = Date.now();
+      fanqieCache.items = items;
+      fanqieCache.updatedAt = Date.now();
+      try {
+        fs.mkdirSync(path.dirname(FANQIE_CACHE_FILE), { recursive: true });
+        fs.writeFileSync(FANQIE_CACHE_FILE, JSON.stringify({ updatedAt: fanqieCache.updatedAt, items }, null, 2));
+      } catch { /* 缓存落盘失败不影响展示 */ }
+      return { items, updatedAt: fanqieCache.updatedAt, stale: false };
+    }
+    const fallback = readFanqieFile();
+    return { items: fallback.items, updatedAt: fallback.updatedAt, stale: true };
+  })();
+  try {
+    return await fanqiePending;
+  } finally {
+    fanqiePending = null;
+  }
+}
+
 /* ───────────── 书籍详情/目录磁盘缓存 + 打开链路健康 ───────────── */
 
 const BOOKS_DIR = path.join(ROOT, 'runtime', 'books');
-const OPEN_HEALTH_PATH = path.join(ROOT, 'runtime', 'book_open_health.json');
 const BOOK_CACHE_TTL = 7 * 24 * 3600 * 1000;
-const OPEN_HEALTH_TTL = 14 * 24 * 3600 * 1000;
-let openHealthCache = null;
 
-function loadOpenHealth() {
-  if (openHealthCache) return openHealthCache;
-  try {
-    openHealthCache = JSON.parse(fs.readFileSync(OPEN_HEALTH_PATH, 'utf8'));
-  } catch {
-    openHealthCache = { sources: {} };
-  }
-  if (!openHealthCache.sources) openHealthCache.sources = {};
-  const now = Date.now();
-  for (const [url, h] of Object.entries(openHealthCache.sources)) {
-    if (!h || now - (h.last || 0) > OPEN_HEALTH_TTL) delete openHealthCache.sources[url];
-  }
-  return openHealthCache;
-}
-
-function saveOpenHealth() {
-  try {
-    fs.writeFileSync(OPEN_HEALTH_PATH, JSON.stringify({ updatedAt: Date.now(), sources: loadOpenHealth().sources }));
-  } catch { /* 缓存失败不影响主流程 */ }
-}
-
-// 详情/目录链路健康：按书源累计成功/失败与平均耗时；连续失败由成功率自然降权，不永久排除。
-function recordOpenHealth(origin, stage, ok, ms) {
-  if (!origin) return;
-  try {
-    const cache = loadOpenHealth();
-    const h = cache.sources[origin] || {};
-    h[`${stage}Ok`] = (h[`${stage}Ok`] || 0) + (ok ? 1 : 0);
-    h[`${stage}Fail`] = (h[`${stage}Fail`] || 0) + (ok ? 0 : 1);
-    const prev = h[`${stage}AvgMs`] || ms;
-    h[`${stage}AvgMs`] = Math.round(prev * 0.7 + ms * 0.3);
-    h.last = Date.now();
-    cache.sources[origin] = h;
-    saveOpenHealth();
-  } catch { /* ignore */ }
-}
-
-function openHealthScore(origin) {
-  const h = loadOpenHealth().sources[origin];
-  if (!h) return 0;
-  const ok = (h.infoOk || 0) + (h.tocOk || 0);
-  const fail = (h.infoFail || 0) + (h.tocFail || 0);
-  if (ok + fail === 0) return 0;
-  const rate = ok / (ok + fail);
-  return rate - 0.00001 * ((h.infoAvgMs || 0) + (h.tocAvgMs || 0));
-}
+/* 打开链路的超时分级、健康落账与失败降权统一由 lib/book_sched.mjs 承担；
+   旧的 flat 健康文件（runtime/book_open_health.json）结构与新模块一致，模块加载时容忍旧字段。 */
 
 function bookCacheKey(origin, bookUrl) {
   return createHash('sha1').update(`${origin || ''}|${bookUrl || ''}`).digest('hex');
@@ -440,6 +538,25 @@ function cleanText(s) {
   return decodeHtml(String(s || '').replace(/<[^>]+>/g, ' ')).replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/** 正文清洗：有些书源把 HTML 片段直接塞进正文，`<br>`、`&nbsp;` 会当文字显示。
+    这里把换行标签还原成换行、解码实体、剥掉残余标签，保留段落结构。 */
+function cleanChapterText(s) {
+  let t = String(s || '').replace(/\r\n?/g, '\n');
+  t = t
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p\s*>/gi, '\n\n')
+    .replace(/<p[^>]*>/gi, '')
+    .replace(/<\/?(?:div|section|article|li)[^>]*>/gi, '\n')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, '');
+  t = decodeHtml(t).replace(/\u00a0/g, ' ');
+  // 有些站点把广告脚本调用当正文塞进来：read2(); / read3(); 之类，直接删掉。
+  t = t.replace(/\b(read\d+|chaptererror|readx|bdshare)\(\)\s*;/gi, ' ');
+  t = t.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  return t.trim();
+}
+
 function cleanAuthor(s) {
   const v = stripTags(s).replace(/^作者[：:]\s*/, '').replace(/^\s*作者\s*/, '').trim();
   return v || '佚名';
@@ -463,6 +580,12 @@ function normalizeBook(info, fallback = {}) {
     coverUrl: cleanText(b.coverUrl),
     tocUrl: cleanText(b.tocUrl) || bookUrl,
     intro: cleanText(b.intro),
+    kind: cleanText(b.kind),
+    lastChapter: cleanText(b.lastChapter),
+    latestChapter: cleanText(b.latestChapter || b.lastChapter),
+    wordCount: cleanText(b.wordCount),
+    sourceName: cleanText(b.sourceName || b.originName),
+    sourceId: cleanText(b.sourceId || b.origin),
     charset: b.charset || null,
     type: Number.isFinite(b.type) ? b.type : 0,
     canUpdate: b.canUpdate !== false,
@@ -623,8 +746,73 @@ async function bookSearchTitles(query) {
 function pruneSearchJobs() {
   const now = Date.now();
   for (const [id, job] of searchJobs) {
-    if (now - job.startedAt > 15 * 60 * 1000) searchJobs.delete(id);
+    if (job.status !== 'running' && now - job.startedAt > 60 * 60 * 1000) searchJobs.delete(id);
   }
+}
+
+/**
+ * 搜书引擎选择：reader-searchd（Reader 原生 Rust 引擎）在线就优先用它，
+ * 不在线或中途失败再回落本地 Node 引擎。两者返回结构一致，供同一套任务管线消费。
+ */
+// 引擎健康探测要 1.4 秒左右，启动时先预热，别让第一次搜索为它白等。
+void searchdHealth(true).catch(() => {});
+
+function searchBooksWithBestEngine(query, handlers) {
+  const localOptions = {
+    concurrency: 150,
+    timeout: 4500,
+    limit: 320,
+    onItems: handlers.onItems,
+    onProgress: handlers.onProgress,
+  };
+  // 不再用 /health 当门禁：引擎忙着搜书时 /health 会慢，判成离线就把整轮打回旧引擎，
+  // 用户看到的就是「还是慢、还是不准」。直接连引擎，连不上再回落。
+  return Promise.resolve().then(() => {
+    const health = healthCacheSnapshot();
+    logLine(`book search engine: ${health.ok ? 'reader-searchd' : 'reader-searchd(try)'}${health.info ? ' (' + health.info.sources + ' 源)' : ''}`);
+    return searchViaSearchd(query, {
+      onItems: handlers.onItems,
+      onProgress: handlers.onProgress,
+      timeoutMs: 150000,
+    })
+      .then((result) => {
+        // searchd 返回的是「每源原始命中」，这里补一次与本地引擎同口径的聚合，
+        // 保证任务收尾时 result.items 也是分组结构（含每本书的 sources 列表）。
+        let grouped = [];
+        try {
+          grouped = groupBooks(result.items, query);
+        } catch {
+          grouped = result.items;
+        }
+        // 按匹配度优先：搜「高武严父，永远比儿子高五个境界」时，
+        // 只共享「高武」两字的泛匹配不能排在真书前面。
+        try {
+          // 先按匹配度，再按命中源数：同名书里「三体·刘慈欣」有 100+ 个源，应该排在只有 3 个源的仿作前面。
+          grouped.sort((a, b) => (Number(b.matchScore) || 0) - (Number(a.matchScore) || 0)
+            || (Number(b.sourceCount) || 0) - (Number(a.sourceCount) || 0));
+        } catch { /* ignore */ }
+        return {
+          items: grouped,
+          stats: {
+            total: result.stats.total,
+            searched: result.stats.searched,
+            withResults: result.stats.withResults,
+            answered: result.stats.answered,
+            failed: result.stats.failed,
+            skipped: 0,
+            unique: grouped.length,
+            books: result.items.length,
+            sourceNames: 0,
+            elapsedMs: result.stats.elapsedMs,
+            engine: 'reader-searchd',
+          },
+        };
+      })
+      .catch((error) => {
+        logLine('searchd 搜索失败，回落本地引擎: ' + (error && error.message ? error.message : error));
+        return searchAllSources(query, localOptions);
+      });
+  });
 }
 
 function startBookSearchJob(query) {
@@ -654,29 +842,32 @@ function startBookSearchJob(query) {
     error: '',
   };
   searchJobs.set(id, job);
-  searchAllSources(query, {
-    concurrency: 150,
-    timeout: 4500,
-    limit: 320,
-    // 边搜边出：每个源一有命中，立刻聚合并推进 revision，页面轮询即可增量追加
+  searchBooksWithBestEngine(query, {
+    // 边搜边出：新增条目先进缓冲，按 200ms 节流聚合，避免每来一批就把上万个条目整表重排、
+    // 把事件循环卡住（卡住会让状态轮询的连接被重置）。
     onItems(added) {
       for (const item of added) job.items.push(item);
-      let fresh = [];
-      try {
-        fresh = groupBooks(job.items, query);
-      } catch { return; }
-      let changed = false;
-      for (const group of fresh) {
-        const key = groupKeyOf(group);
-        if (job.seen.has(key)) continue;
-        job.seen.add(key);
-        job.grouped.push(group);
-        changed = true;
-      }
-      if (changed) {
-        job.revision++;
-        job.hits = job.grouped.length;
-      }
+      if (job._flushTimer) return;
+      job._flushTimer = setTimeout(() => {
+        job._flushTimer = null;
+        let fresh = [];
+        try {
+          fresh = groupBooks(job.items, query);
+        } catch { return; }
+        let changed = false;
+        for (const group of fresh) {
+          const key = groupKeyOf(group);
+          if (job.seen.has(key)) continue;
+          job.seen.add(key);
+          job.grouped.push(group);
+          changed = true;
+        }
+        if (changed) {
+          job.revision++;
+          job.hits = job.grouped.length;
+        }
+      }, 120);
+      job._flushTimer.unref?.();
     },
     onProgress(progress) {
       job.done = progress.done;
@@ -691,12 +882,12 @@ function startBookSearchJob(query) {
     },
   }).then((result) => {
     job.status = 'done';
-    // 把关掉任务时才算出的权威聚合结果里「还没出现过的书」补到末尾，已有顺序一律不动
-    for (const group of result.items || []) {
-      const key = groupKeyOf(group);
-      if (job.seen.has(key)) continue;
-      job.seen.add(key);
-      job.grouped.push(group);
+    if (job._flushTimer) { clearTimeout(job._flushTimer); job._flushTimer = null; }
+    // 最终结果以收尾时的有序列表为准整体替换：流式阶段先到的未必最相关。
+    if (Array.isArray(result.items) && result.items.length) {
+      job.grouped = result.items.slice();
+      job.seen = new Set(job.grouped.map((g) => groupKeyOf(g)));
+      job.revision++;
     }
     job.stats = result.stats || null;
     job.done = job.total;
@@ -708,8 +899,22 @@ function startBookSearchJob(query) {
     job.skipped = result.stats?.skipped || job.skipped;
     job.finishedAt = Date.now();
     logLine(`book search job ${id} done: ${job.hits} books / ${job.sourcesWithResults} sources in ${job.stats?.elapsedMs || 0}ms`);
-    // 后台预热前若干本的详情/目录/首章，不阻塞任务完成与首屏。
-    void warmTopBooks(job.grouped.slice(0, 10));
+    // 后台预热前若干本的详情/目录/首章（lib/book_warm：并发 3、原子写、失败隔离），不阻塞任务完成与首屏。
+    // 预热选源：跳过「只能搜不能开」的 17K 类源，并且每组只热「排在最前的可开源」，否则热了也打不开。
+    void warmOnSearchHits(
+      job.grouped.slice(0, 8).flatMap((g) =>
+        (g.sources || []).filter((s) => s && s.url && s.bookUrl && !/api\.17k\.com/i.test(String(s.url))).slice(0, 1).map((s) => ({
+          sourceId: s.url,
+          bookUrl: s.bookUrl,
+          name: g.name,
+          author: g.author,
+          coverUrl: g.coverUrl,
+          intro: g.intro,
+          wordCount: g.wordCount,
+        }))
+      ),
+      { limit: 3, engine: gatedWarmEngine }
+    );
   }).catch((error) => {
     job.status = 'error';
     job.error = error.message || String(error);
@@ -733,7 +938,8 @@ function publicJob(job) {
     failed: job.failed,
     skipped: job.skipped,
     // 关键改动：搜索中就开始返回已有结果（以前要等 done 才吐 items）
-    items: job.grouped,
+    items: job.grouped.length > 400 ? job.grouped.slice(0, 400) : job.grouped,
+    totalGroups: job.grouped.length,
     revision: job.revision,
     rawHits: job.rawHits || job.items.length,
     startedAt: job.startedAt,
@@ -744,7 +950,80 @@ function publicJob(job) {
 }
 
 
+/* 用户打开优先闸门：预热任务在有人正在打开书时让道，避免抢占 4 个引擎槽。 */
+let openInFlight = 0;
+const warmWaiters = [];
+function holdWarm() {
+  openInFlight += 1;
+}
+function releaseWarm() {
+  openInFlight = Math.max(0, openInFlight - 1);
+  if (openInFlight === 0) {
+    while (warmWaiters.length) {
+      const resolve = warmWaiters.shift();
+      resolve();
+    }
+  }
+}
+function warmGate() {
+  if (openInFlight === 0) return Promise.resolve();
+  return new Promise((resolve) => warmWaiters.push(resolve));
+}
+const gatedWarmEngine = {
+  bookInfo: async (...args) => { await warmGate(); return engineBookInfo(...args); },
+  chapterList: async (...args) => { await warmGate(); return engineChapterList(...args); },
+  chapterContent: async (...args) => { await warmGate(); return engineChapterContent(...args); },
+};
+
+/**
+ * 快速探一下候选源的目录首页有多少章，用来避开只有 20/100 章的残缺源。
+ * 超时或失败返回 -1，排序时保持原顺序。
+ */
+async function probeTocCount(candidate, timeoutMs = 5000) {
+  const qs = new URLSearchParams({
+    bookUrl: candidate.bookUrl,
+    bookSourceUrl: candidate.bookSourceUrl,
+    probe: 'true',
+  });
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${searchdBase()}/toc?${qs.toString()}`, { signal: ac.signal, cache: 'no-store' });
+    if (!res.ok) return -1;
+    const body = await res.json();
+    return Array.isArray(body.data) ? body.data.length : -1;
+  } catch {
+    return -1;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** 并发探测候选目录，任意一个超过 200 章就立即采用，不必等最慢的源。 */
+async function probeBestSource(list, timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    let best = { count: -1, i: -1 };
+    let done = 0;
+    const finish = () => resolve(best);
+    list.forEach((candidate, i) => {
+      probeTocCount(candidate, timeoutMs)
+        .then((count) => {
+          done += 1;
+          if (count > best.count) best = { count, i };
+          if (best.count > 200 || done >= list.length) finish();
+        })
+        .catch(() => {
+          done += 1;
+          if (done >= list.length) finish();
+        });
+    });
+    if (!list.length) finish();
+  });
+}
+
 async function openBookWithSources(body) {
+  holdWarm();
+  try {
   const candidates = [];
   const push = (item) => {
     if (!item || !item.bookUrl) return;
@@ -758,100 +1037,252 @@ async function openBookWithSources(body) {
     for (const item of body.sources) push(item);
   }
   if (!candidates.length) throw new Error('这本书没有可用的书源');
+  // 主书地址：body 里没带就以排序前的第一个候选为准（原实现误用了未定义变量 bookUrl）。
+  const primaryBookUrl = String(body.bookUrl || candidates[0].bookUrl || '').trim();
+  if (!primaryBookUrl) throw new Error('这本书没有可用的书源');
 
-  // 点击先查磁盘缓存：任一候选源命中就直接返回，不再转圈请求。
+  // 点击先查磁盘缓存：取候选里章数最多的一份，避免被只有 20 章的残缺源缓存劫持。
+  // 少于 100 章的缓存一律不用；正好 100 章则可能是分页只抓了第一页，也重新打开拿全量。
+  let cachedBest = null;
   for (const candidate of candidates) {
     const cached = readBookCache(candidate.bookSourceUrl, candidate.bookUrl);
-    if (cached) return { ...cached, cached: true };
+    const chapterCount = Array.isArray(cached && cached.chapters) ? cached.chapters.length : 0;
+    if (!cached || chapterCount < 100 || chapterCount === 100) continue;
+    if (!cachedBest || chapterCount > (cachedBest.chapters || []).length) cachedBest = cached;
+  }
+  if (cachedBest) return { ...cachedBest, cached: true };
+
+  // 健康分 + 历史阶段 P50 + 24h 降权名单排序（lib/book_sched：失败源自然降权，不永久排除）。
+  let ordered = rankSources(candidates)
+    .map(({ _score, _p50, _deprioritized, ...c }) => c);
+
+  // 打开前先探目录首页：谁章数多用谁，避免健康分把「只有 20 章的残缺源」排到前面。
+  const probeList = ordered.slice(0, 5);
+  const bestProbe = await probeBestSource(probeList);
+  if (bestProbe.i > 0) {
+    const winner = probeList[bestProbe.i];
+    ordered = [winner, ...ordered.filter((c) => c !== winner)];
+    logLine(`book source probe: ${winner.bookSourceUrl} 首页 ${bestProbe.count} 章，优先打开`);
   }
 
-  // 静态站名权重 + 详情/目录历史成功率排序；失败源自然降权，不永久排除。
-  const ordered = candidates
-    .map((c) => ({ ...c, _rank: sourceRank(c.name) + openHealthScore(c.bookSourceUrl) }))
-    .sort((a, b) => b._rank - a._rank)
-    .map(({ _rank, ...c }) => c);
-
-  // 前 3 个候选同时起跑，谁先成功用谁；并发上限 3，去重已在 push 完成。
-  const BATCH = 3;
-  const MAX_TRY = 8;
+  // 多候选并行 race：前 3 个不同源同时起跑「详情 → 目录 → 首章」，先成功先用（lib/book_race）。
+  // 失败按阶段回灌健康账；全部失败再交给上层走 Reader 兜底。
+  await awaitSourceCache();
+  // 已知「能搜不能开」的源（返回空目录/无正文）不进打开候选，避免用户点第一本白等一轮超时；
+  // 判定依据是实测：api.17k.com 搜索秒回但目录恒为空。健康账仍会记录它，长期降权。
+  const OPEN_BAD_HOSTS = /api\.17k\.com/i;
+  const engineCandidates = ordered
+    .map((c) => ({ sourceId: c.bookSourceUrl, source: getSourceByUrl(c.bookSourceUrl), bookUrl: c.bookUrl, name: c.name }))
+    .filter((c) => c.source && !OPEN_BAD_HOSTS.test(String(c.source.url || '')));
   let lastError = null;
-  for (let i = 0; i < Math.min(ordered.length, MAX_TRY); i += BATCH) {
-    const batch = ordered.slice(i, i + BATCH);
-    const winner = await new Promise((resolve, reject) => {
-      let settled = 0;
-      let firstReject = null;
-      let done = false;
-      batch.forEach((candidate) => {
-        openBook(candidate.bookUrl, candidate.bookSourceUrl)
-          .then((out) => {
-            if (done) return;
-            done = true;
-            out.sourceUsed = candidate.name || out.book.originName || '';
-            out.triedSources = ordered.indexOf(candidate) + 1;
-            resolve(out);
-          })
-          .catch((error) => {
-            if (done) return;
-            settled += 1;
-            firstReject = error;
-            lastError = error;
-            logLine(`open book source failed (${candidate.name || candidate.bookSourceUrl}): ${error.message}`);
-            if (settled === batch.length) reject(firstReject || new Error('这本书没有可用的书源'));
-          });
-      });
+  const MAX_TRY = 8;
+  if (!engineCandidates.length && ordered.length) {
+    lastError = new Error('这本书命中的书源只提供搜索、不提供目录正文（17K 接口），换一本来读');
+    logLine(`all candidates are search-only sources: ${ordered.map((c) => c.bookSourceUrl).join(', ')}`);
+  }
+  if (engineCandidates.length) {
+    // 多源时并行 3 路比较目录完整度，单候选就 1 路；谁章数多用谁，避免残缺源胜出。
+    // 探测到完整目录（>200 章）就只开这一路；首页都不足 200 章时才并行 3 路比完整度。
+    const attempts = engineCandidates.length > 1 ? (bestProbe.count > 200 ? 1 : 3) : 1;
+
+    // searchd 与本地引擎同时起跑，哪个先成功就用哪个：
+    // searchd 能正确解析描述符 bookUrl 且无子进程开销，本地引擎覆盖 searchd 解析不了的源。
+    const fastRacePromise = raceOpenViaSearchd(
+      ordered.slice(0, MAX_TRY).map((c) => ({
+        bookSourceUrl: c.bookSourceUrl,
+        bookUrl: c.bookUrl,
+        name: c.name,
+      })),
+      { attempts, budgetMs: 12000 }
+    ).catch((error) => ({ ok: false, error: error && error.message, tried: [] }));
+    const slowRacePromise = raceOpen(engineCandidates.slice(0, MAX_TRY), {
+      attempts,
+      budgetMs: 14000,
+      timeoutMs: 9000,
     });
-    return winner;
+
+    const firstOk = await new Promise((resolve) => {
+      let settled = 0;
+      let best = null;
+      const done = (kind) => (r) => {
+        settled += 1;
+        if (r && r.ok) {
+          const count = Array.isArray(r.chapters) ? r.chapters.length : 0;
+          if (!best || count > best.count) best = { kind, race: r, count };
+          // 目录超过 200 章基本可判定完整，立即采用；否则等另一引擎的结果再比一次。
+          if (best.count > 200) resolve({ kind: best.kind, race: best.race });
+        }
+        if (settled >= 2) resolve(best ? { kind: best.kind, race: best.race } : null);
+      };
+      fastRacePromise.then(done('searchd')).catch(() => done('searchd')(null));
+      slowRacePromise.then(done('legado')).catch(() => done('legado')(null));
+    });
+
+    if (firstOk && firstOk.kind === 'searchd') {
+      const fastRace = firstOk.race;
+      const origin = fastRace.sourceId;
+      const winnerSource = getSourceByUrl(origin);
+      const out = {
+        book: normalizeBook(
+          { ...fastRace.book, originName: (winnerSource && winnerSource.name) || fastRace.book.originName || '', origin },
+          { bookUrl: fastRace.book.bookUrl || primaryBookUrl, origin }
+        ),
+        saved: false,
+        saveError: '本地规则引擎未写入书架',
+        chapters: (fastRace.chapters || []).map((c, i) => ({
+          title: cleanText(c.name) || `第 ${i + 1} 章`,
+          url: c.url,
+          index: i,
+          isVip: false,
+          isPay: false,
+          isVolume: !!c.isVolume,
+        })),
+        firstChapter: {
+          title: cleanText(fastRace.firstChapter?.name) || '第 1 章',
+          url: fastRace.firstChapter?.url || '',
+          index: 0,
+          content: fastRace.firstChapter?.content || '',
+          length: (fastRace.firstChapter?.content || '').length,
+        },
+        engine: 'reader-searchd',
+        sourceUsed: (winnerSource && winnerSource.name) || '',
+        triedSources: (fastRace.tried || []).length,
+      };
+      writeBookCache(origin, out.book.bookUrl || primaryBookUrl, out);
+      logLine(`searchd open ok (${out.sourceUsed}) in ${fastRace.ms}ms`);
+      return out;
+    }
+    const race = firstOk && firstOk.kind === 'legado' ? firstOk.race : await slowRacePromise;
+    if (race.ok) {
+      const winnerSource = getSourceByUrl(race.sourceId);
+      const origin = race.sourceId;
+      const book = normalizeBook(
+        { ...race.book, originName: (winnerSource && winnerSource.name) || race.book.originName || '', origin },
+        { bookUrl: race.book.bookUrl || primaryBookUrl, origin }
+      );
+      const chaptersOut = (race.chapters || []).map((c, i) => ({
+        title: cleanText(c.name) || `第 ${i + 1} 章`,
+        url: c.url,
+        index: i,
+        isVip: false,
+        isPay: false,
+        isVolume: false,
+      }));
+      const first = race.firstChapter || {};
+      const out = {
+        book,
+        saved: false,
+        saveError: '本地规则引擎未写入书架',
+        chapters: chaptersOut,
+        firstChapter: {
+          title: cleanText(first.name) || (chaptersOut[0] && chaptersOut[0].title) || '第 1 章',
+          url: first.url || (chaptersOut[0] && chaptersOut[0].url) || '',
+          index: 0,
+          content: first.content || '',
+          length: (first.content || '').length,
+        },
+        engine: 'legado',
+        sourceUsed: (winnerSource && winnerSource.name) || '',
+        triedSources: (race.tried || []).length + 1,
+      };
+      writeBookCache(origin, out.book.bookUrl || primaryBookUrl, out);
+      logLine(`engine race open ok (${out.sourceUsed}) in ${race.ms}ms, tried ${out.triedSources}${race.timeline ? ' | ' + JSON.stringify(race.timeline).slice(0, 700) : ''}`);
+      return out;
+    }
+    const STAGE_MAP = { bookInfo: 'info', chapterList: 'toc', chapterContent: 'content' };
+    for (const t of race.tried || []) {
+      recordOutcome(t.sourceId, STAGE_MAP[t.stage] || 'info', { ok: false, ms: t.ms || 0, error: t.error });
+    }
+    lastError = new Error(race.error || '这本书没有可用的书源');
+    logLine(`engine race failed: ${lastError.message}（试了 ${(race.tried || []).length} 个源）`);
+  }
+
+  // 引擎全军覆没且 Reader 健康时，仍按老规矩兜底一次（改造前该兜底在单源 openBook 里）。
+  if (await readerHealth()) {
+    const fallbackOrigin = body.bookSourceUrl || body.origin || (candidates[0] && candidates[0].bookSourceUrl);
+    try {
+      const out = await openBookViaReader(primaryBookUrl, fallbackOrigin);
+      out.engine = 'reader';
+      out.sourceUsed = out.sourceUsed || fallbackOrigin;
+      logLine('engine race failed, reader fallback ok');
+      return out;
+    } catch (readerError) {
+      logLine(`reader fallback failed: ${readerError.message || readerError}`);
+      lastError = readerError;
+    }
   }
   throw lastError || new Error('这本书没有可用的书源');
-}
-
-// 列表浏览期后台预热：并发 3 抓前 10 本的详情+目录+首章，落磁盘缓存；失败只跳过，不影响搜索。
-async function warmTopBooks(groups) {
-  if (!Array.isArray(groups) || !groups.length) return;
-  try {
-    if (!(await readerHealth())) return;
-  } catch {
-    return;
+  } finally {
+    releaseWarm();
   }
-  const queued = groups.slice(0, 10);
-  const CONCURRENCY = 3;
-  let cursor = 0;
-  const worker = async () => {
-    while (true) {
-      const group = queued[cursor++];
-      if (!group) return;
-      const first = (group.sources && group.sources[0]) || {};
-      if (!first.bookUrl) continue;
-      if (readBookCache(first.url, first.bookUrl)) continue;
-      try {
-        await openBookWithSources({
-          bookUrl: first.bookUrl,
-          bookSourceUrl: first.url,
-          origin: first.name,
-          sources: group.sources,
-        });
-      } catch (error) {
-        logLine(`warm skip ${group.name || first.bookUrl}: ${error.message || error}`);
-      }
-    }
+}
+
+/** 规则引擎链路：详情 → 目录 → 首章正文，全部走 legado 引擎（单源版本，保留给兜底/调试）。 */
+async function openBookViaEngine(source, bookUrl, origin) {
+  const openT0 = Date.now();
+  let stageT0 = openT0;
+  const info = await timedEngine('bookInfo', source, () => engineBookInfo(source, { bookUrl }, { timeoutMs: remainingBudget(0, origin, 'info') }));
+  if (!info.ok) {
+    recordOutcome(origin, 'info', { ok: false, ms: info.ms || Date.now() - stageT0, error: info.error });
+    throw new Error(info.error || '详情解析失败');
+  }
+  recordOutcome(origin, 'info', { ok: true, ms: info.ms || Date.now() - stageT0 });
+  // 慢但成功也换源：该源此阶段历史 P50 存在且本次超过 1.5 倍时，放弃它去试下一个候选（冷启动无基线不触发）。
+  if (shouldSwitchFor(origin, 'info', { ok: true, ms: info.ms || Date.now() - stageT0 })) {
+    throw new Error(`慢源切换：info ${info.ms}ms 超出历史基线 1.5 倍`);
+  }
+  const book = normalizeBook({ ...info, originName: source.name, origin }, { bookUrl, origin });
+
+  stageT0 = Date.now();
+  const toc = await timedEngine('chapterList', source, () => engineChapterList(source, book, { timeoutMs: remainingBudget(Date.now() - openT0, origin, 'toc') }));
+  if (!toc.ok || !Array.isArray(toc.chapters) || !toc.chapters.length) {
+    recordOutcome(origin, 'toc', { ok: false, ms: toc.ms || Date.now() - stageT0, error: toc.error || '目录为空' });
+    throw new Error(toc.error || '目录为空');
+  }
+  recordOutcome(origin, 'toc', { ok: true, ms: toc.ms || Date.now() - stageT0 });
+  if (shouldSwitchFor(origin, 'toc', { ok: true, ms: toc.ms || Date.now() - stageT0 })) {
+    throw new Error(`慢源切换：toc ${toc.ms}ms 超出历史基线 1.5 倍`);
+  }
+
+  const chaptersOut = toc.chapters.map((c, i) => ({
+    title: cleanText(c.name) || `第 ${i + 1} 章`,
+    url: c.url,
+    index: i,
+    isVip: false,
+    isPay: false,
+    isVolume: false,
+  }));
+  const first = chaptersOut[0];
+  stageT0 = Date.now();
+  const content = await timedEngine('chapterContent', source, () => engineChapterContent(source, book, { name: first.title, url: first.url }, { timeoutMs: remainingBudget(Date.now() - openT0, origin, 'content') }));
+  if (!content.ok) {
+    recordOutcome(origin, 'content', { ok: false, ms: content.ms || Date.now() - stageT0, error: content.error });
+    throw new Error(content.error || '第一章正文为空');
+  }
+  recordOutcome(origin, 'content', { ok: true, ms: content.ms || Date.now() - stageT0 });
+
+  const firstChapter = {
+    title: first.title,
+    url: first.url,
+    index: 0,
+    content: content.content,
+    length: content.content.length,
   };
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queued.length) }, () => worker())).catch(() => {});
+  const out = {
+    book,
+    saved: false,
+    saveError: '本地规则引擎未写入书架',
+    chapters: chaptersOut,
+    firstChapter,
+    engine: 'legado',
+  };
+  writeBookCache(origin, book.bookUrl, out);
+  return out;
 }
 
-function sourceRank(name) {
-  const n = String(name || '');
-  if (/顶点/.test(n)) return 100;
-  if (/笔趣阁/.test(n)) return 95;
-  if (/奇书|九五|全本|书吧|文学/.test(n)) return 85;
-  if (/小说/.test(n)) return 60;
-  return 40;
-}
-
-async function openBook(bookUrl, bookSourceUrl) {
-  if (!bookUrl) throw new Error('缺少 bookUrl');
+/** Reader /reader3 兜底链路：仅引擎失败或无源、且 Reader 健康时试一次。 */
+async function openBookViaReader(bookUrl, bookSourceUrl) {
   const origin = bookSourceUrl || guessBookOrigin(bookUrl);
-  if (!origin) throw new Error('这本书没有可用的书源');
-
   let stageT0 = Date.now();
   let info;
   try {
@@ -859,9 +1290,9 @@ async function openBook(bookUrl, bookSourceUrl) {
       await readerRequest('POST', '/reader3/getBookInfo', { url: bookUrl, bookSourceUrl: origin }, 8000),
       '取书籍详情'
     );
-    recordOpenHealth(origin, 'info', true, Date.now() - stageT0);
+    recordOutcome(origin, 'info', { ok: true, ms: Date.now() - stageT0 });
   } catch (error) {
-    recordOpenHealth(origin, 'info', false, Date.now() - stageT0);
+    recordOutcome(origin, 'info', { ok: false, ms: Date.now() - stageT0, error: error && error.message });
     throw error;
   }
   const book = normalizeBook(info, { bookUrl, origin });
@@ -878,15 +1309,14 @@ async function openBook(bookUrl, bookSourceUrl) {
       }, 10000),
       '取目录'
     );
-    recordOpenHealth(origin, 'toc', true, Date.now() - stageT0);
+    recordOutcome(origin, 'toc', { ok: true, ms: Date.now() - stageT0 });
   } catch (error) {
-    recordOpenHealth(origin, 'toc', false, Date.now() - stageT0);
+    recordOutcome(origin, 'toc', { ok: false, ms: Date.now() - stageT0, error: error && error.message });
     throw error;
   }
 
   if (!Array.isArray(chapters) || !chapters.length) throw new Error('这本书没有取到目录');
 
-  // 目录成功不代表正文能读；先读第一章，读不到就换下一个源。
   const probeChapter = chapters.find((c) => !c.isVip && !c.isPay && !c.isVolume) || chapters[0];
   const probe = await readChapter({
     bookUrl: book.bookUrl,
@@ -922,9 +1352,29 @@ async function openBook(bookUrl, bookSourceUrl) {
     content: probe.content,
     length: probe.length,
   };
-  const out = { book, saved, saveError, chapters: chaptersOut, firstChapter };
+  const out = { book, saved, saveError, chapters: chaptersOut, firstChapter, engine: 'reader3' };
   writeBookCache(origin, book.bookUrl, out);
   return out;
+}
+
+async function openBook(bookUrl, bookSourceUrl) {
+  if (!bookUrl) throw new Error('缺少 bookUrl');
+  const origin = bookSourceUrl || guessBookOrigin(bookUrl);
+  if (!origin) throw new Error('这本书没有可用的书源');
+
+  await awaitSourceCache();
+  const source = getSourceByUrl(origin);
+  if (source) {
+    try {
+      return await openBookViaEngine(source, bookUrl, origin);
+    } catch (engineError) {
+      // openBookViaEngine 内部已按阶段落健康账，这里不再重复记一笔，避免失败被计两次。
+      logLine(`engine open failed (${source.name}): ${engineError.message || engineError}`);
+      logLine(`engine open failed (${source.name}): ${engineError.message || engineError}`);
+    }
+  }
+  if (await readerHealth()) return openBookViaReader(bookUrl, origin);
+  throw new Error(source ? `规则引擎打开失败：${source.name}` : '这本书没有可用的书源');
 }
 
 function contentToText(html) {
@@ -962,6 +1412,50 @@ async function readChapter({ bookUrl, bookSourceUrl, chapterUrl, index, chapterT
   const content = contentToText(data);
   if (!content) throw new Error('这一章没有取到正文');
   return { content, length: content.length };
+}
+
+/** 正文：规则引擎优先，失败再回落 Reader /reader3。 */
+async function readChapterWithEngine(payload) {
+  const origin = payload.bookSourceUrl || guessBookOrigin(payload.bookUrl);
+  // Reader 引擎优先：它会顺着书源的「下一页」把整章拼完，旧 Node 引擎经常只抓到
+  // 站点的一句提示（例如只有 7 个字的「您现在阅读的是」）却算成功。
+  try {
+    const fast = await chapterContentViaSearchd({
+      bookUrl: payload.bookUrl,
+      bookSourceUrl: origin,
+      chapterUrl: payload.chapterUrl,
+      chapterTitle: payload.chapterTitle,
+    });
+    if (fast.ok && fast.content && fast.content.trim().length >= 40) {
+      const content = cleanChapterText(fast.content);
+      return { content, length: content.length, engine: 'reader-searchd' };
+    }
+    if (fast.ok) logLine(`searchd chapter too short (${(fast.content || '').length} 字)`);
+    else logLine('searchd chapter failed: ' + (fast.error || ''));
+  } catch (e) {
+    logLine('searchd chapter error: ' + (e.message || e));
+  }
+  const source = getSourceByUrl(origin);
+  if (source) {
+    const res = await timedEngine('chapterContent', source, () => engineChapterContent(
+      source,
+      { bookUrl: payload.bookUrl },
+      { name: payload.chapterTitle || '', url: payload.chapterUrl },
+      { timeoutMs: 8000 }
+    ));
+    const text = (res && res.content) || '';
+    if (res.ok && text.trim() && text.trim().length >= 40) {
+      const content = cleanChapterText(text);
+      return { content, length: content.length, engine: 'legado' };
+    }
+    logLine(`engine chapter failed (${source.name}): ${res.error || ('正文过短 ' + text.length + ' 字')}`);
+  }
+  const fallback = await readChapter(payload, 10000);
+  if (fallback && fallback.content) {
+    fallback.content = cleanChapterText(fallback.content);
+    fallback.length = fallback.content.length;
+  }
+  return fallback;
 }
 
 async function saveReadingProgress({ bookUrl, index, position }) {
@@ -1526,6 +2020,14 @@ async function proxy(req, res, id, app, prefix) {
   headers['x-forwarded-host'] = req.headers.host || '';
   headers['x-forwarded-prefix'] = prefix;
 
+  if (id === 'music' && req.method === 'GET' && rest === '/') {
+    const cached = staticPageCache.get(id);
+    if (cached && Date.now() - cached.at < STATIC_PAGE_TTL) {
+      res.writeHead(cached.status, cached.headers);
+      return res.end(cached.body);
+    }
+  }
+
   let body;
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     body = await readRaw(req);
@@ -1600,6 +2102,9 @@ async function proxy(req, res, id, app, prefix) {
     }
     const buf = Buffer.from(finalText, 'utf8');
     outHeaders['content-length'] = String(buf.length);
+    if (id === 'music' && rest === '/' && r.status === 200) {
+      staticPageCache.set(id, { at: Date.now(), status: r.status, headers: { ...outHeaders }, body: buf });
+    }
     res.writeHead(r.status, outHeaders);
     return res.end(buf);
   }
@@ -1628,9 +2133,7 @@ async function proxy(req, res, id, app, prefix) {
 
 /* ───────────────────────── HTTP ───────────────────────── */
 
-// 新房模块要在开始接客之前挂好（缺模块不影响启动，只会那间房报「还没装好」）
-await loadRooms();
-
+// 房间模块在 bind 之后异步加载；未就绪期间对应前缀先回 200 占位，不阻塞 ping/客厅。
 const server = http.createServer(async (req, res) => {
   let url;
   try {
@@ -1643,11 +2146,11 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (p === '/' || p === '/五五客厅') {
-      return sendHtml(res, fs.readFileSync(PAGE_FILE));
+      return sendHtml(res, PAGE_HTML);
     }
 
     if (p === '/book' || p === '/book/') {
-      return sendHtml(res, fs.readFileSync(BOOK_FILE));
+      return sendHtml(res, BOOK_HTML);
     }
 
     if (p === '/api/status') {
@@ -1748,21 +2251,47 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true, items: await bookSearch(q), query: q });
     }
 
-    if (p === '/api/book/shelf') {
+    if (p === '/api/book/recommend') {
       try {
-        if (!(await ensureReaderWeb())) throw new Error('书房引擎没有起来');
-        const items = await readerShelf();
-        const info = await bookInfo();
-        return sendJson(res, 200, { ok: true, items, sources: info.sources, groups: info.groupTotal });
+        const out = await fanqieRecommend(false);
+        return sendJson(res, 200, { ok: true, items: out.items, updatedAt: out.updatedAt, stale: out.stale });
       } catch (e) {
-        return sendJson(res, 502, { ok: false, items: [], message: e.message || String(e) });
+        const fallback = readFanqieFile();
+        return sendJson(res, 200, { ok: true, items: fallback.items, updatedAt: fallback.updatedAt, stale: true });
+      }
+    }
+
+    // 书房自己的书架：只收用户主动点「加入书架」的书，打开书不会自动入库。
+    if (p === '/api/book/shelf') {
+      const items = readShelf();
+      return sendJson(res, 200, { ok: true, items, count: items.length });
+    }
+
+    if (p === '/api/book/shelf/add' && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const items = addToShelf(body || {});
+        logLine(`book shelf add: ${body && body.name ? body.name : body && body.bookUrl}`);
+        return sendJson(res, 200, { ok: true, items, count: items.length });
+      } catch (e) {
+        return sendJson(res, 400, { ok: false, message: e.message || String(e) });
+      }
+    }
+
+    if (p === '/api/book/shelf/remove' && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const items = removeFromShelf(body && body.bookUrl);
+        logLine(`book shelf remove: ${body && body.bookUrl}`);
+        return sendJson(res, 200, { ok: true, items, count: items.length });
+      } catch (e) {
+        return sendJson(res, 400, { ok: false, message: e.message || String(e) });
       }
     }
 
     if (p === '/api/book/open' && req.method === 'POST') {
       const body = await readBody(req);
       try {
-        if (!(await ensureReaderWeb())) throw new Error('书房引擎没有起来');
         const out = await openBookWithSources(body);
         return sendJson(res, 200, Object.assign({ ok: true }, out));
       } catch (e) {
@@ -1774,8 +2303,9 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/book/chapter' && req.method === 'POST') {
       const body = await readBody(req);
       try {
-        if (!(await ensureReaderWeb())) throw new Error('书房引擎没有起来');
-        const out = await readChapter(body);
+        const out = await readChapterWithEngine(body);
+        // 已在书架的书顺手记进度；不在书架的不会被自动加进去。
+        try { touchShelfProgress(body.bookUrl, Number(body.index), body.chapterTitle); } catch {}
         return sendJson(res, 200, Object.assign({ ok: true }, out));
       } catch (e) {
         logLine('book chapter error: ' + (e.stack || e.message || e));
@@ -1873,6 +2403,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ── 后装的五间新房：页面、接口、静态资源都从这里进 ── */
+    const pendingRoom = ROOM_LIST.find((r) => (p === `/${r.id}/` || p.startsWith(`/${r.id}/`) || p === `/api/${r.id}` || p.startsWith(`/api/${r.id}/`)))?.id;
+    if (pendingRoom && !roomsReady().includes(pendingRoom)) {
+      if (p.startsWith('/api/')) return sendJson(res, 200, { ok: false, message: `房间 ${pendingRoom} 加载中` });
+      return sendHtml(res, roomBootPlaceholder(pendingRoom), 200);
+    }
     if (await roomRoutes(req, res, url)) return;
 
     // 三个 Web 项目：同一个端口下的三条通道
@@ -1902,7 +2437,23 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, BIND, () => {
+  console.log(`[boot] bind ok in ${Date.now() - bootStartedAt}ms → http://${BIND === '0.0.0.0' ? '127.0.0.1' : BIND}:${PORT}`);
   console.log(`五五客厅  →  http://${BIND === '0.0.0.0' ? '127.0.0.1' : BIND}:${PORT}`);
   console.log(`  /magnet/  /music/  /vod/  /book/`);
   console.log(`  /download/  /library/  /notes/  /calendar/  /photos/`);
+
+  // bind 之后再做重活：房间逐个 8s 超时；引擎预热 5s；失败只记日志，不阻塞 ping/客厅。
+  void (async () => {
+    try {
+      await loadRooms({ initTimeoutMs: 8000 });
+    } catch (e) {
+      logLine(`rooms background init failed: ${e && e.message ? e.message : e}`);
+      console.error('[rooms] 后台初始化失败:', e && (e.stack || e.message));
+    }
+    try {
+      await engineWarmup({ timeoutMs: 5000 });
+    } catch (e) {
+      logLine(`engine warmup failed: ${e && e.message ? e.message : e}`);
+    }
+  })();
 });
