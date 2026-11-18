@@ -27,6 +27,7 @@
   --notes:#c0b79c;
   --calendar:#c489a9;
   --photos:#7fb4c4;
+  --cast:#e0a46e;
 }
 
 /* 每间房自己那一抹色 */
@@ -35,6 +36,7 @@ body[data-room="library"] {--a:var(--library); --soft:rgba(156,172,105,.13);--ed
 body[data-room="notes"]   {--a:var(--notes);   --soft:rgba(192,183,156,.13);--edge:rgba(192,183,156,.34);--glow:rgba(192,183,156,.40)}
 body[data-room="calendar"]{--a:var(--calendar);--soft:rgba(196,137,169,.13);--edge:rgba(196,137,169,.34);--glow:rgba(196,137,169,.40)}
 body[data-room="photos"]  {--a:var(--photos);  --soft:rgba(127,180,196,.13);--edge:rgba(127,180,196,.34);--glow:rgba(127,180,196,.40)}
+body[data-room="cast"]    {--a:var(--cast);    --soft:rgba(224,164,110,.13);--edge:rgba(224,164,110,.34);--glow:rgba(224,164,110,.40)}
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}

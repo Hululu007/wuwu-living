@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>投屏 · 五五客厅</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='28' font-family='serif' fill='%23e0a46e' text-anchor='middle'%3E投%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/room.css">
+<style>
+  .hero{
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    padding:18px 20px;border:1px solid var(--line);border-radius:14px;
+    background:linear-gradient(150deg,rgba(224,164,110,.07),rgba(255,255,255,.015));
+  }
+  .hero .phone{
+    width:56px;height:88px;border-radius:12px;flex:0 0 auto;
+    border:1px solid var(--edge);background:rgba(224,164,110,.10);
+    display:flex;align-items:center;justify-content:center;position:relative;
+  }
+  .hero .phone::before{
+    content:"";position:absolute;top:5px;left:50%;transform:translateX(-50%);
+    width:16px;height:2px;border-radius:2px;background:var(--edge);
+  }
+  .hero .phone svg{width:26px;height:26px;color:var(--a);opacity:.9}
+  .hero .meta{flex:1 1 260px;min-width:0}
+  .hero .meta h2{margin:0 0 6px;font-size:15px;font-weight:600;letter-spacing:.02em;color:var(--ink)}
+  .hero .meta .kv{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:11.5px;color:var(--muted)}
+  .hero .meta .kv b{color:var(--ink);font-weight:500}
+  .hero .meta .hint{margin-top:7px;font-size:11.5px;color:var(--faint);line-height:1.7}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:var(--faint)}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(127,187,140,.16)}
+  .dot.live{background:var(--a);box-shadow:0 0 0 3px rgba(224,164,110,.20);animation:pulse 1.6s infinite}
+  .dot.bad{background:var(--danger);box-shadow:0 0 0 3px rgba(221,119,104,.16)}
+  .stat-inline{font-size:11px;color:var(--faint);letter-spacing:.04em;white-space:nowrap}
+  @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(224,164,110,.06)}}
+
+  .sec{margin-top:26px}
+  .sec-h{display:flex;align-items:baseline;gap:9px;margin:0 0 12px}
+  .sec-h h2{margin:0;font-size:13.5px;font-weight:600;letter-spacing:.07em;color:var(--ink)}
+  .sec-h .n{font-size:11px;color:var(--faint)}
+
+  .presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+  .preset{
+    text-align:left;cursor:pointer;padding:13px 14px;border-radius:11px;
+    border:1px solid var(--line);background:rgba(255,255,255,.025);
+    transition:.16s;font:inherit;color:inherit;position:relative;
+  }
+  .preset:hover{border-color:var(--edge);transform:translateY(-1px);background:rgba(224,164,110,.05)}
+  .preset.on{border-color:var(--a);background:var(--soft);box-shadow:0 0 0 1px var(--edge) inset}
+  .preset .nm{font-size:13px;font-weight:600;color:var(--ink);letter-spacing:.02em;display:flex;align-items:center;gap:7px}
+  .preset .nm::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--a);opacity:.55}
+  .preset.on .nm::before{opacity:1}
+  .preset .ds{margin-top:6px;font-size:11px;line-height:1.55;color:var(--muted)}
+  .preset .badge{
+    position:absolute;top:11px;right:11px;font-size:9px;letter-spacing:.08em;color:var(--a);
+    border:1px solid var(--edge);border-radius:5px;padding:1px 5px;display:none;
+  }
+  .preset.on .badge{display:inline-block}
+
+  .acts{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .big{
+    font:inherit;cursor:pointer;padding:11px 26px;border-radius:10px;letter-spacing:.03em;
+    border:1px solid var(--edge);background:var(--soft);color:var(--ink);font-weight:600;
+    transition:.16s;
+  }
+  .big:hover:not(:disabled){background:rgba(224,164,110,.20);border-color:var(--a)}
+  .big.primary{background:var(--a);border-color:var(--a);color:#17110a}
+  .big.primary:hover:not(:disabled){filter:brightness(1.08)}
+  .big.ghost{background:transparent;border-color:var(--line);color:var(--muted);font-weight:500}
+  .big.ghost:hover:not(:disabled){border-color:var(--edge);color:var(--ink)}
+  .big:disabled{opacity:.4;cursor:not-allowed}
+  .extra{
+    flex:1 1 220px;min-width:150px;font:inherit;font-size:12px;color:var(--ink);
+    padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.03);
+  }
+  .extra::placeholder{color:var(--faint)}
+  .extra:focus{outline:none;border-color:var(--edge);background:rgba(224,164,110,.05)}
+
+  .logbox{
+    margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    background:#08090b;
+  }
+  .logbox .lh{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:7px 12px;border-bottom:1px solid var(--line2);font-size:10.5px;color:var(--faint);letter-spacing:.05em;
+  }
+  .logbox .lh button{
+    font:inherit;font-size:10px;cursor:pointer;color:var(--muted);background:none;border:1px solid var(--line);
+    border-radius:6px;padding:2px 8px;
+  }
+  .logbox .lh button:hover{color:var(--ink);border-color:var(--edge)}
+  .logbox pre{
+    margin:0;padding:11px 13px;max-height:260px;overflow:auto;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:11px;line-height:1.7;
+    color:#9a958c;white-space:pre-wrap;word-break:break-all;
+  }
+  .logbox pre:empty::before{content:"还没有日志。起一次投屏就会写在这里。";color:var(--faint)}
+
+  .toast{
+    position:fixed;left:50%;bottom:34px;transform:translate(-50%,14px);
+    padding:10px 18px;border-radius:9px;font-size:12.5px;letter-spacing:.02em;
+    background:rgba(18,20,23,.94);border:1px solid var(--line);color:var(--ink);
+    box-shadow:0 8px 28px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.22s;z-index:50;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  .toast.bad{border-color:rgba(221,119,104,.5);color:#f0b8b0}
+  .toast.good{border-color:rgba(127,187,140,.45);color:#c4e4cb}
+
+  .notice{
+    margin:0 0 14px;padding:10px 13px;border:1px dashed var(--line);border-radius:9px;
+    font-size:11.5px;color:var(--muted);line-height:1.85;
+  }
+  .notice b{color:var(--ink);font-weight:600}
+  .notice code{
+    font-family:"SF Mono",Menlo,monospace;font-size:10.5px;color:var(--a);
+    background:rgba(224,164,110,.09);border-radius:4px;padding:1px 5px;
+  }
+</style>
+</head>
+<body data-room="cast">
+<div class="grain" aria-hidden="true"></div>
+
+<header class="top">
+  <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+  <div class="titlebar">
+    <h1><i></i>投屏</h1>
+    <span class="sub">手机画面搬到 Mac，声音留在电脑</span>
+  </div>
+  <div class="top-act">
+    <span class="stat-inline" id="connText">检查设备…</span>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="phone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M11 18h2"/></svg>
+    </div>
+    <div class="meta">
+      <h2 id="devTitle"><span class="dot"></span>未连接手机</h2>
+      <div class="kv" id="devKv"></div>
+      <div class="hint" id="devHint">插上 USB → 手机上点「允许 USB 调试」。连上后这里会自动变。</div>
+    </div>
+  </section>
+
+  <div class="notice" id="notice" hidden>
+    <b>第一次用？</b>手机需要在「开发者选项」里打开 <code>USB 调试</code>；如果插上没反应，把数据线换一根（很多线只有电没有数据）。
+  </div>
+
+  <section class="sec">
+    <div class="sec-h"><h2>怎么投</h2><span class="n" id="presetHint">选一个，点下面开始</span></div>
+    <div class="presets" id="presets"></div>
+    <div class="acts">
+      <button class="big primary" id="btnStart" type="button">开始投屏</button>
+      <button class="big ghost" id="btnStop" type="button" disabled>停止</button>
+      <button class="big ghost" id="btnRecord" type="button">录一份</button>
+      <input class="extra" id="extra" type="text" placeholder="额外 scrcpy 参数，例如 --no-audio" spellcheck="false">
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><h2>日志</h2><span class="n" id="logHint"></span></div>
+    <div class="logbox">
+      <div class="lh">
+        <span>runtime/cast.log</span>
+        <button id="btnLogRefresh" type="button">刷新</button>
+      </div>
+      <pre id="log"></pre>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const presetsEl = $('#presets');
+  const btnStart = $('#btnStart');
+  const btnStop = $('#btnStop');
+  const btnRecord = $('#btnRecord');
+  const extraEl = $('#extra');
+  const logEl = $('#log');
+  const toastEl = $('#toast');
+
+  let state = null;
+  let picked = 'default';
+  let busy = false;
+  let toastTimer = null;
+  let logTimer = null;
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function toast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.className = 'toast on' + (kind === 'bad' ? ' bad' : kind === 'good' ? ' good' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.className = 'toast'; }, 2600);
+  }
+
+  async function api(path, opt) {
+    const r = await fetch(path, Object.assign({ headers: { 'content-type': 'application/json' } }, opt || {}));
+    let d = {};
+    try { d = await r.json(); } catch {}
+    if (!r.ok) throw new Error(d.message || ('HTTP ' + r.status));
+    return d;
+  }
+
+  function renderPresets(list) {
+    presetsEl.innerHTML = '';
+    for (const p of list) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'preset' + (p.arg === picked ? ' on' : '');
+      b.dataset.arg = p.arg;
+      b.innerHTML = '<span class="badge">当前</span>' +
+        '<span class="nm">' + esc(p.label) + '</span>' +
+        '<span class="ds">' + esc(p.desc) + '</span>';
+      b.addEventListener('click', () => {
+        if (busy) return;
+        picked = p.arg;
+        for (const x of presetsEl.children) x.classList.toggle('on', x.dataset.arg === picked);
+      });
+      presetsEl.appendChild(b);
+    }
+  }
+
+  function renderState(s) {
+    state = s;
+    const running = !!(s.session && s.session.running);
+    const dev = s.device;
+    const ready = !!dev;
+
+    // 设备卡
+    const dot = running ? 'live' : ready ? 'on' : 'bad';
+    let title;
+    if (running) title = '正在投屏 · ' + (PRESET_LABEL[s.session.preset] || s.session.preset || '默认');
+    else if (ready) title = (dev.model || '手机') + ' 已连接';
+    else title = '未连接手机';
+    $('#devTitle').innerHTML = '<span class="dot ' + dot + '"></span>' + esc(title);
+
+    const kv = [];
+    if (dev) {
+      if (dev.serial) kv.push('序列号 <b>' + esc(dev.serial) + '</b>');
+      if (dev.android) kv.push('Android <b>' + esc(dev.android) + '</b>' + (dev.sdk ? '（API ' + dev.sdk + '）' : ''));
+      if (dev.width && dev.height) kv.push('分辨率 <b>' + dev.width + '×' + dev.height + '</b>');
+    }
+    $('#devKv').innerHTML = kv.join('');
+    $('#devKv').style.display = kv.length ? 'flex' : 'none';
+
+    let hint = '';
+    if (running) {
+      hint = '手机可以息屏，画面会一直在。窗口里：Ctrl+F 全屏 · Ctrl+P 息屏 · Ctrl+H 主页 · Ctrl+B 返回 · Ctrl+S 截图';
+    } else if (ready) {
+      hint = '就绪。选好预设点「开始投屏」，scrcpy 窗口会自己弹出来。';
+    } else if (s && s.devices && s.devices.length) {
+      const d0 = s.devices[0];
+      hint = '检测到 ' + esc(d0.serial) + '，但状态是 ' + esc(d0.state) + '。请在手机上点「允许 USB 调试」。';
+    } else {
+      hint = s && s.error ? esc(s.error) : '插上 USB → 手机上点「允许 USB 调试」。连上后这里会自动变。';
+    }
+    $('#devHint').textContent = hint;
+
+    // 顶部
+    $('#connText').innerHTML = running
+      ? '<span class="dot live"></span>投屏中'
+      : ready ? '<span class="dot on"></span>已连接' : '<span class="dot bad"></span>未连接';
+
+    // 按钮
+    btnStart.disabled = busy || running || !ready;
+    btnStop.disabled = busy || !running;
+    btnRecord.disabled = busy || running || !ready;
+    document.body.dataset.running = running ? '1' : '0';
+
+    // 通知条：只有没设备、且没在投时才提示首次设置
+    $('#notice').hidden = !!(ready || running);
+
+    // 日志：投屏中自动跟
+    scheduleLog(running);
+  }
+
+  const PRESET_LABEL = {};
+  function labels() {
+    return api('/api/cast/presets').then((d) => {
+      for (const p of d.presets || []) PRESET_LABEL[p.arg] = p.label;
+      return d.presets || [];
+    });
+  }
+
+  function scheduleLog(follow) {
+    clearTimeout(logTimer);
+    const tick = async () => {
+      await refreshLog();
+      if (follow) logTimer = setTimeout(tick, 2000);
+    };
+    tick();
+  }
+
+  async function refreshLog() {
+    try {
+      const d = await api('/api/cast/log?lines=140');
+      const lines = d.lines || [];
+      logEl.textContent = lines.join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+      $('#logHint').textContent = lines.length ? lines.length + ' 行' : '';
+    } catch {}
+  }
+
+  async function refresh() {
+    try {
+      const s = await api('/api/cast/state');
+      if (!presetsEl.children.length) renderPresets(s.presets || []);
+      renderState(s);
+      return s;
+    } catch (e) {
+      $('#connText').innerHTML = '<span class="dot bad"></span>读不到状态';
+      $('#devHint').textContent = e.message;
+      return null;
+    }
+  }
+
+  async function act(fn, label) {
+    if (busy) return;
+    busy = true;
+    const s0 = state;
+    btnStart.disabled = btnStop.disabled = btnRecord.disabled = true;
+    try {
+      const r = await fn();
+      toast(r.message || label, 'good');
+    } catch (e) {
+      toast(e.message || '操作失败', 'bad');
+    } finally {
+      busy = false;
+      await refresh();
+    }
+  }
+
+  btnStart.addEventListener('click', () => {
+    const extra = extraEl.value.trim();
+    act(() => api('/api/cast/start', {
+      method: 'POST',
+      body: JSON.stringify({ preset: picked, extra }),
+    }), '已开始').then(() => {
+      // 起了之后把日志跟起来
+    });
+  });
+
+  btnStop.addEventListener('click', () => {
+    act(() => api('/api/cast/stop', { method: 'POST', body: '{}' }), '已停止');
+  });
+
+  btnRecord.addEventListener('click', () => {
+    act(() => api('/api/cast/record', { method: 'POST', body: '{}' }), '录制中');
+  });
+
+  $('#btnLogRefresh').addEventListener('click', refreshLog);
+
+  // 回车直接开始，减少一次点击
+  extraEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !btnStart.disabled) btnStart.click();
+  });
+
+  labels().then((list) => {
+    if (list.length) renderPresets(list);
+  }).catch(() => {});
+
+  refresh();
+  setInterval(refresh, 3000);
+})();
+</script>
+</body>
+</html>

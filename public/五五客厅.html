@@ -25,6 +25,7 @@
   --notes:#c0b79c;
   --calendar:#c489a9;
   --photos:#7fb4c4;
+  --cast:#e0a46e;
   --ok:#7fbb8c;
 }
 *{box-sizing:border-box}
@@ -240,6 +241,7 @@ kbd{
 .door[data-id="notes"]{--a:var(--notes);--soft:rgba(192,183,156,.13);--edge:rgba(192,183,156,.36);--glow:rgba(192,183,156,.4)}
 .door[data-id="calendar"]{--a:var(--calendar);--soft:rgba(196,137,169,.13);--edge:rgba(196,137,169,.36);--glow:rgba(196,137,169,.4)}
 .door[data-id="photos"]{--a:var(--photos);--soft:rgba(127,180,196,.13);--edge:rgba(127,180,196,.36);--glow:rgba(127,180,196,.4)}
+.door[data-id="cast"]{--a:var(--cast);--soft:rgba(224,164,110,.13);--edge:rgba(224,164,110,.36);--glow:rgba(224,164,110,.4)}
 
 /* ───────────────────────────── 页脚 ───────────────────────────── */
 .floor{
@@ -378,11 +380,11 @@ kbd{
   </header>
 
   <section class="hero">
-    <h1>六件事，<em>一套服务。</em></h1>
+    <h1>七件事，<em>一套服务。</em></h1>
     <div class="lede">
       <div class="rule"></div>
-      <p>下载、媒体库、笔记、追更、相册，连同原来的四间房，<br>仍然只有一个地址、一条通道。</p>
-      <p class="note">门牌没变，屋子从四间变成九间。</p>
+      <p>下载、媒体库、笔记、追更、相册、投屏，连同原来的四间房，<br>仍然只有一个地址、一条通道。</p>
+      <p class="note">门牌没变，屋子从四间变成十间。</p>
     </div>
   </section>
 
@@ -499,7 +501,7 @@ kbd{
 
   </section>
 
-  <div class="sect-h"><h2>新添的五间</h2><span class="line"></span><span class="cnt">同一栋楼，另一层</span></div>
+  <div class="sect-h"><h2>新添的六间</h2><span class="line"></span><span class="cnt">同一栋楼，另一层</span></div>
   <section class="doors" aria-label="新添的五个入口">
 
     <div class="door" data-id="download" role="button" tabindex="0" style="--i:4" aria-label="进入下载中心">
@@ -599,19 +601,39 @@ kbd{
       </div>
       <div class="door-foot"><span class="go"><span>进入</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span><kbd>9</kbd></div>
     </div>
+    <div class="door" data-id="cast" role="button" tabindex="0" style="--i:9" aria-label="进入投屏">
+      <span class="tag-new">新</span>
+      <div class="door-top">
+        <span class="status"><i></i><em>读取中</em></span>
+        <span class="glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <rect x="6" y="2.4" width="12" height="19.2" rx="2.4"/>
+            <path d="M9.6 19h4.8"/>
+            <path d="M9 7.4h6" opacity=".45"/>
+          </svg>
+        </span>
+      </div>
+      <div class="door-body">
+        <div class="fig"><b>—</b><span>台设备</span></div>
+        <h3>投屏</h3>
+        <p class="line">手机画面搬到 Mac，声音留在电脑。</p>
+        <div class="chips"><span>scrcpy</span></div>
+      </div>
+      <div class="door-foot"><span class="go"><span>进入</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></span><kbd>0</kbd></div>
+    </div>
 
   </section>
 
   <section class="floor" aria-label="使用说明">
-    <div><b>一套服务</b><span>磁力、音乐、影视由客厅统一转发；书接本机 Reader 的书源数据；新五间直接跑在客厅进程里。</span></div>
-    <div><b>一个地址</b><span>8890 是唯一的门牌。九间屋子都在它下面，新装的五间不占新端口。</span></div>
-    <div><b>状态</b><span>每 8 秒探一次；哪间没开，点一下门就会自己启动。新五间的数据都落在本机 runtime/ 里。</span></div>
+    <div><b>一套服务</b><span>磁力、音乐、影视由客厅统一转发；书接本机 Reader 的书源数据；新六间直接跑在客厅进程里。</span></div>
+    <div><b>一个地址</b><span>8890 是唯一的门牌。十间屋子都在它下面，新装的六间不占新端口。</span></div>
+    <div><b>状态</b><span>每 8 秒探一次；哪间没开，点一下门就会自己启动。新六间的数据都落在本机 runtime/ 里。</span></div>
   </section>
 
   <footer class="foot">
     <span>全部在本机跑，数据不出门</span>
     <div class="ports">
-      <span>一条通道</span><span>九间屋子</span><span>同一个地址</span>
+      <span>一条通道</span><span>十间屋子</span><span>同一个地址</span>
     </div>
     <span id="updated">状态读取中</span>
   </footer>
@@ -657,9 +679,9 @@ kbd{
 (function () {
   'use strict';
 
-  /* 内嵌在舞台里的四间；后五间是同一进程里的页面，直接跳过去 */
+  /* 内嵌在舞台里的四间；后六间是同一进程里的页面，直接跳过去 */
   var STAGE_IDS = ['magnet', 'book', 'music', 'vod'];
-  var ORDER = ['magnet', 'book', 'music', 'vod', 'download', 'library', 'notes', 'calendar', 'photos'];
+  var ORDER = ['magnet', 'book', 'music', 'vod', 'download', 'library', 'notes', 'calendar', 'photos', 'cast'];
   var STATE = { apps: [], summary: null };
   var ROOM_FALLBACK = {
     magnet: { id:'magnet', name:'搜磁力', kind:'web', path:'/magnet/' },
@@ -670,7 +692,8 @@ kbd{
     library: { id:'library', name:'书库', path:'/library/' },
     notes: { id:'notes', name:'记事', path:'/notes/' },
     calendar: { id:'calendar', name:'日历', path:'/calendar/' },
-    photos: { id:'photos', name:'相册', path:'/photos/' }
+    photos: { id:'photos', name:'相册', path:'/photos/' },
+    cast: { id:'cast', name:'投屏', path:'/cast/' }
   };
   var ACTIVE = null;
   var starting = {};
@@ -917,6 +940,16 @@ kbd{
         cta: '进入', state: 'on'
       };
     }
+    if (id === 'cast') {
+      var live = !!room.running;
+      var n = room.connected || 0;
+      return {
+        fig: n ? fmt(n) : '—', unit: '台设备',
+        chips: [live ? ('投屏中 · ' + String(room.preset || '默认')) : (n ? '可以开始' : '插 USB 就绪'),
+          'scrcpy 5.0.1'],
+        cta: '进入', state: 'on'
+      };
+    }
     return { fig: '—', unit: '', chips: [], cta: '进入', state: 'on' };
   }
 
@@ -996,6 +1029,13 @@ kbd{
     if (!a || !frame) return;
     var mySeq = ++stageSeq;
 
+    // ★ 2026-11-18：房间若把自己导航出了自己的前缀（iframe 里装进了客厅首页），
+    //   下次进这间会直接看到"两个客厅"。先看当前路径，落回根就强制重载本间。
+    if (frame.dataset.loaded) {
+      var nowPath = null;
+      try { nowPath = frame.contentWindow.location.pathname; } catch (e) {}
+      if (nowPath === '/') frame.dataset.loaded = '';
+    }
     if (!frame.dataset.loaded) {
       frame.src = (a.path || ('/' + id + '/'));
       frame.dataset.loaded = '1';
@@ -1027,6 +1067,21 @@ kbd{
     }
     frame.onload = function () {
       if (mySeq !== stageSeq || ACTIVE !== id) return;
+      var p = null;
+      try { p = frame.contentWindow.location.pathname; } catch (e) {}
+      // ★ 2026-11-18：房间把首页写死成 '/'，在客厅前缀下会跳成客厅根地址，
+      //   舞台 iframe 里就套进第二层客厅、冒出两个返回。这里发现即拉回本间。
+      if (p === '/') {
+        if (frame.dataset.recovered === String(mySeq)) {
+          closeStage();
+          toast('「' + a.name + '」的返回地址不对，已退出舞台');
+          return;
+        }
+        frame.dataset.recovered = String(mySeq);
+        frame.src = (a.path || ('/' + id + '/'));
+        toast('已回到「' + a.name + '」');
+        return;
+      }
       veil.classList.add('off');
     };
   }
@@ -1136,7 +1191,9 @@ kbd{
     if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '')) return;
     if (ACTIVE) { if (e.key === 'Escape') closeStage(); return; }
     var n = Number(e.key);
-    if (n >= 1 && n <= 9) {
+    if (n === 0) {
+      enter('cast');   // 0 → 投屏（1-9 已经被九间房占满）
+    } else if (n >= 1 && n <= 9) {
       var id = ORDER[n - 1];
       if (id) enter(id);
     }

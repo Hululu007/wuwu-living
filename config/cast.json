@@ -1,0 +1,8 @@
+{
+  "_说明": "投屏配置。preset 是页面默认选中的预设；scrcpyDir / adb 留空表示自动探测（~/D盘/bin/scrcpy-5.0.1、/usr/local/bin/adb）。extraArgs 是每次启动都追加的参数。",
+  "preset": "default",
+  "scrcpyDir": "",
+  "adb": "",
+  "extraArgs": "",
+  "recordDir": "~/Movies"
+}

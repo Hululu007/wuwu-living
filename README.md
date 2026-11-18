@@ -1,8 +1,8 @@
 # 五五客厅
 
-九个项目合成**一套服务**：搜磁力、看书、听音乐、看视频，加上下载中心、媒体库、笔记库、追更日历、相册。
+十个项目合成**一套服务**：搜磁力、看书、听音乐、看视频，加上下载中心、媒体库、笔记库、追更日历、相册、投屏。
 
-对外只有一个地址、一个端口，九间屋子同源：
+对外只有一个地址、一个端口，十间屋子同源：
 
 ```
 http://127.0.0.1:8890
@@ -15,9 +15,10 @@ http://127.0.0.1:8890
   /notes/      笔记库
   /calendar/   追更日历
   /photos/     相册
+  /cast/       投屏
 ```
 
-前四间是原来就有的（三个 Web 项目由客厅统一转发、页面里的本地绝对路径会被改写到各自前缀下；书房由客厅直接出页面）。后五间是新装的，直接跑在客厅这一个 Node 进程里：一套 `lib/<房间>.mjs` 模块 + 一份 `runtime/<房间>.json`，不开新进程、不加新端口。
+前四间是原来就有的（三个 Web 项目由客厅统一转发、页面里的本地绝对路径会被改写到各自前缀下；书房由客厅直接出页面）。后六间是新装的，直接跑在客厅这一个 Node 进程里：一套 `lib/<房间>.mjs` 模块 + 一份 `runtime/<房间>.json`，不开新进程、不加新端口。
 
 ## 现在有什么
 
@@ -32,27 +33,28 @@ http://127.0.0.1:8890
 | 笔记库 | 划线、随手记、标签、全文检索、导出 Markdown | `/notes/` | 不占 | `#C0B79C` |
 | 追更日历 | RSS/Atom 订阅 + 手动追更 + B 站番剧表，倒计时与周视图 | `/calendar/` | 不占 | `#C489A9` |
 | 相册 | 本地相片索引、缩略图（视频抽首帧）、时间轴、大图、DLNA 投屏 | `/photos/` | 不占 | `#7FB4C4` |
+| 投屏 | 手机画面投到 Mac（scrcpy 5.0.1），六种预设、一键启停、录屏 | `/cast/` | 不占 | `#E0A46E` |
 
-内部端口只给客厅用，不再是对外入口。8890 是唯一门牌。**新五间不占任何端口**。
+内部端口只给客厅用，不再是对外入口。8890 是唯一门牌。**新六间不占任何端口**。
 
 ## 它到底怎么合
 
-- **同一条通道**：浏览器只连 8890。`/magnet`、`/music`、`/vod` 由客厅转发给各自进程；`/book` 由客厅自己出页面；后五间由客厅自己的房间模块直接处理。
+- **同一条通道**：浏览器只连 8890。`/magnet`、`/music`、`/vod` 由客厅转发给各自进程；`/book` 由客厅自己出页面；后六间由客厅自己的房间模块直接处理。
 - **同源路径改写**：三个 Web 项目原本都把自己的接口写成 `/api/...`、`/lib/...`、`/proxy?...` 这种根路径。客厅在返回 HTML / JS / JSON / m3u8 时，把引号或反引号紧跟的本地绝对路径改写到前缀下。
-- **房间注册表**：`lib/rooms.mjs` 声明九间屋子（id、名字、主色、页面文件），把 `/<id>/` 的页面请求、`/api/<id>/...` 的接口请求分给对应的 `lib/<id>.mjs`；某间模块没落盘时只有那间房报「还没装好」，客厅照常运行。
+- **房间注册表**：`lib/rooms.mjs` 声明十间屋子（id、名字、主色、页面文件），把 `/<id>/` 的页面请求、`/api/<id>/...` 的接口请求分给对应的 `lib/<id>.mjs`；某间模块没落盘时只有那间房报「还没装好」，客厅照常运行。
 - **统一外壳**（不改别人的项目代码）：客厅在转发三个旧前端时，给它们套同一套顶栏（`← 回客厅` + 主色圆点 + 房名）、页脚和同一套颜色/圆角/滚动条/字体；页面内部 DOM 与脚本一行不动。样式在 `public/assets/legacy-shell.css`，注入逻辑在 `lib/legacy_shell.mjs`。
 - **两个注入**（不改别人的项目代码）：客厅在转发磁力页时补一个「⬇ 加入下载」按钮，在转发视频页时补一个「✎ 记一笔」按钮，两者分别打 `/api/download/add` 与 `/api/notes/create`。
-- **不复制业务**：搜索、播放、下载、书源解析仍由各自项目处理；客厅负责同源、改写、状态、启停、以及这五间新房的全部逻辑。
+- **不复制业务**：搜索、播放、下载、书源解析仍由各自项目处理；客厅负责同源、改写、状态、启停、以及这六间新房的全部逻辑。
 
 ## 用起来
 
-- 点门 = 进屋。前四间没开的话会自动启动，等它起来再推门；后五间点门直接跳过去。
-- 进了前四间的屋，顶栏可以「新窗口 / 刷新 / 停止」；后五间页面自己带一条「客厅」返回。
+- 点门 = 进屋。前四间没开的话会自动启动，等它起来再推门；后六间点门直接跳过去。
+- 进了前四间的屋，顶栏可以「新窗口 / 刷新 / 停止」；后六间页面自己带一条「客厅」返回。
 - 切到别的门，音乐不会停：四个 iframe 都活着。
 - 首页一屏概览：杭州天气（open-meteo）、今日待办（可勾选/新增）、下载进度、最近在读、下次追更。点「下载 / 最近在读 / 下次追更」三格直接进对应房间。
 - 门上的数字和状态每 8 秒刷新一次：亮着点是就绪，灰的是没开，闪的是启动中。
 - 顶部「全部启动」一把叫醒三个网页服务。
-- 快捷键：`1` 磁力 / `2` 书 / `3` 音乐 / `4` 影视 / `5` 下载 / `6` 媒体库 / `7` 笔记 / `8` 追更 / `9` 相册，`Esc` 回客厅。
+- 快捷键：`1` 磁力 / `2` 书 / `3` 音乐 / `4` 影视 / `5` 下载 / `6` 媒体库 / `7` 笔记 / `8` 追更 / `9` 相册 / `0` 投屏，`Esc` 回客厅。
 
 ### 看书（书房）
 
@@ -109,6 +111,18 @@ http://127.0.0.1:8890
 7. 大图预览可以点 `×`、按 `Esc`、点遮罩三种方式关闭，关闭时停掉视频、清掉 `src`，并回到原来的滚动位置。
 8. 投屏走 SSDP 发现 MediaRenderer + SOAP `SetAVTransportURI`；**没设备就说没设备**，并给可复制的直链/下载原图作为降级。客厅默认只监听 127.0.0.1，电视访问不到——只有 `node hub.mjs --lan` 启动时投屏才真的能连上，页面会把这条限制和本机局域网 IP 一起标出来。
 
+### 投屏
+
+> 注意这跟相册的「DLNA 投屏」是两件事：相册那个是把**照片推到电视**；这一间是把**手机整块屏幕投到这台 Mac**。
+
+1. 后端不重写参数，直接调 `~/D盘/bin/scrcpy-mac/投屏`——那份脚本已经把 Windows 那套 `.bat` 的三个毛病踩平了（`--window-aspect-ratio` 在 scrcpy 5.0.1 里根本不存在、`--crop` 的 height=0 会被拒、序列号与分辨率写死换机就错位）。客厅只负责「起哪个预设、什么时候停」。
+2. 六个预设：`default` / `full` / `pro` / `crop169` / `铺满` / `视频`。`crop169` 的裁剪几何按 `adb shell wm size` 实测值算，不写死。
+3. 进程是 `detached` 起的，日志落在 `runtime/cast.log`，pid 落盘 `runtime/cast.json`；客厅重启后能认回自己起的那一个，也会校验 pid 命令行里确实有 `scrcpy` 才敢杀，避免误伤手动开的窗口或 pid 复用。
+4. 设备靠 `adb devices -l` 自动发现；未授权（`unauthorized`）会明确说「请在手机上点允许 USB 调试」，不会含糊地报失败。多设备可在 `POST /api/cast/start` 里传 `serial`。
+5. 录屏走 `投屏 录`，默认落到 `~/Movies/scrcpy-<时间戳>.mp4`（`config/cast.json` 的 `recordDir` 可改）。
+6. 页面每 3 秒刷一次状态；投屏中会自动跟日志。首页那道门的数字是「已连接设备数」，投屏时会变成「投屏中 · 预设名」。
+7. 快捷键 `0` 进投屏（`1`–`9` 已被前面九间占满）。
+
 ## 端口
 
 | 端口 | 谁在用 |
@@ -145,7 +159,7 @@ runtime/
 ```bash
 cd ~/D盘/项目/五五客厅
 ./hub.sh start       # 启动（已装 launchd 的话由它托管）
-./hub.sh status      # 看客厅状态（九间房都在这一屏）
+./hub.sh status      # 看客厅状态（十间房都在这一屏）
 ./hub.sh open        # 起来并打开浏览器
 ./hub.sh stop
 ./hub.sh log         # 跟日志
@@ -157,7 +171,7 @@ cd ~/D盘/项目/五五客厅
 
 ## 接口
 
-前四间沿用原来的接口（`/api/book/*` 见下），后五间统一在 `/api/<房间>/` 下：
+前四间沿用原来的接口（`/api/book/*` 见下），后六间统一在 `/api/<房间>/` 下：
 
 | 房间 | 主要接口 |
 |---|---|
@@ -165,8 +179,9 @@ cd ~/D盘/项目/五五客厅
 | 媒体库 | `GET /api/library/list`、`POST /api/library/scan`、`GET /api/library/scan-status`、`GET /api/library/detail?id=`、`GET /api/library/poster?id=`、`GET /api/library/media?path=`、`POST /api/library/progress` |
 | 笔记库 | `GET /api/notes/list?q=&source=&tag=&sort=`、`POST /api/notes/create`、`/update`、`/delete`、`/tag/rename`、`GET /api/notes/stats`、`GET /api/notes/export?ids=&q=&tag=` |
 | 追更日历 | `GET /api/calendar/overview`、`POST /api/calendar/feed/add`、`/feed/remove`、`/feed/refresh`、`GET /api/calendar/bangumi`、`POST /api/calendar/track/add`、`/track/update`、`/track/remove`、`/seen` |
+| 投屏 | `GET /api/cast/state`、`GET /api/cast/devices`、`GET /api/cast/presets`、`POST /api/cast/start`（`{preset,serial,extra}`）、`POST /api/cast/stop`、`POST /api/cast/record`、`GET /api/cast/log?lines=` |
 | 相册 | `GET /api/photos/list?month=&offset=&limit=`、`POST /api/photos/scan`、`GET /api/photos/scan-status`、`GET /api/photos/thumb?id=`、`GET /api/photos/full?id=`、`GET /api/photos/info?id=`、`POST /api/photos/dlna/discover`、`/dlna/cast` |
-| 首页 | `GET /api/home/summary`（天气/待办/下载/在读/追更/九间房小结一次取全）、`GET/POST /api/home/todos` |
+| 首页 | `GET /api/home/summary`（天气/待办/下载/在读/追更/十间房小结一次取全）、`GET/POST /api/home/todos` |
 | 书房 | `POST /api/book/search-start`、`GET /api/book/search-status?job=`（**进行中就返回 items**，另有 `revision` / `hits` / `rawHits`，只追加不重排） |
 | 视频推荐 | `GET /api/vod/recs`（精选 8 部 + 电影/电视剧/短剧/综艺四区，10 分钟缓存）、`GET /api/vod/img?u=`（海报代理 + 落盘缓存） |
 | 下载播放 | `GET /api/download/file?id=`（只允许该任务自己落盘的文件，支持 Range） |
@@ -205,7 +220,8 @@ vod:    ['/api/', '/hls.min.js', '/proxy']
 │   ├── apps.json            # 四个老项目的位置、内部端口、对外路径
 │   ├── download.json        # 下载目录、并发、磁力开关
 │   ├── library.json         # 影片扫描目录、并发、缓存天数
-│   └── calendar.json        # 订阅源、抓取间隔
+│   ├── calendar.json        # 订阅源、抓取间隔
+│   └── cast.json            # 投屏默认预设、scrcpy/adb 路径、录屏目录
 ├── lib/
 │   ├── rooms.mjs            # 房间注册表 + 分发 + 首页汇总粘合
 │   ├── home.mjs             # 首页：天气、待办、聚合
@@ -213,15 +229,16 @@ vod:    ['/api/', '/hls.min.js', '/proxy']
 │   ├── library.mjs + library_parse/douban/media.mjs  # 媒体库：扫描、解析、刮削
 │   ├── notes.mjs            # 笔记库：存储、检索、导出
 │   ├── calendar.mjs + calendar_feeds.mjs             # 追更日历：RSS 抓取、排期
-│   ├── photos.mjs + photos_dlna.mjs                  # 相册：索引、缩略图、投屏
+│   ├── photos.mjs + photos_dlna.mjs                  # 相册：索引、缩略图、DLNA 投屏
+│   ├── cast.mjs             # 投屏：调 scrcpy-mac 的「投屏」，管进程与设备
 │   ├── reader_query.py      # 只读 Reader 数据库（书源统计/分组）
 │   ├── export_book_sources.py
 │   └── book_source_search.mjs
 ├── public/
-│   ├── 五五客厅.html         # 首页（九扇门 + 一屏概览 + 舞台）
+│   ├── 五五客厅.html         # 首页（十扇门 + 一屏概览 + 舞台）
 │   ├── 书房.html             # 书房阅读器（末尾带「收笔记」）
-│   ├── 下载中心.html 媒体库.html 笔记库.html 追更日历.html 相册.html
-│   └── assets/room.css       # 五间新房共用的公共样式与主色
+│   ├── 下载中心.html 媒体库.html 笔记库.html 追更日历.html 相册.html 投屏.html
+│   └── assets/room.css       # 六间新房共用的公共样式与主色
 ├── runtime/                  # 运行时数据（见上）
 └── README.md
 ```
