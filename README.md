@@ -122,6 +122,13 @@ http://127.0.0.1:8890
 5. 录屏走 `投屏 录`，默认落到 `~/Movies/scrcpy-<时间戳>.mp4`（`config/cast.json` 的 `recordDir` 可改）。
 6. 页面每 3 秒刷一次状态；投屏中会自动跟日志。首页那道门的数字是「已连接设备数」，投屏时会变成「投屏中 · 预设名」。
 7. 快捷键 `0` 进投屏（`1`–`9` 已被前面九间占满）。
+8. 页内遥控：返回 / 主页 / 多任务 / 电源 / 亮屏 / 息屏 / 音量 ± / 静音 / 转 90° / 转正，共 11 个键，直连 `adb shell input keyevent`，不用伸手碰手机。多设备时所有遥控与截图都跟随「用哪台」下拉框选的序列号。
+9. 手机媒体音量可读可设（`GET/POST /api/cast/volume`）：优先 `cmd media_session`，Android 10 以下退回 `settings get system volume_music_*`。
+10. 截图墙：`POST /api/cast/shot` 走 `adb exec-out screencap -p` 直接落盘（PNG 可能几 MB，不能走字符串返回），落在 `runtime/cast/shots/`，最多列 18 张，点开可看大图并下载。
+11. 启动前会拿 `scrcpy --help` 核一遍要传的 `--opt`，版本不认就直接拦下并把缺哪个写在页面上；`GET /api/cast/doctor` 的「选项支持」一项也是同一份 `--help` 缓存。
+12. 失败原因会写进 `runtime/cast.json` 的 `lastError`（消息 + 日志尾巴），下次进页面还看得见，不用蹲日志翻。启动成功会自动清掉。
+13. 日志支持 `?filter=important`：滤掉 scrcpy 的 `INFO:` 常规行，只留分隔线、WARN、ERROR 与中文失败提示——一屏 INFO 会把真正失败的那一行冲走。
+14. 页内快捷键：`空格` 开始/停止、`S` 截图、`R` 录一份、`B` 返回、`H` 主页。预设与质量档的选择记在 `localStorage`，失效自动回退。
 
 ## 端口
 
