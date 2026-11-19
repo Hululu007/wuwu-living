@@ -45,6 +45,11 @@
   .devpick select:focus{border-color:var(--edge)}
   @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(224,164,110,.06)}}
 
+  .hero.offline{border-color:rgba(221,119,104,.42);background:linear-gradient(150deg,rgba(221,119,104,.08),rgba(255,255,255,.015))}
+  .hero.offline .dot{background:var(--danger)}
+  .hero.offline .phone{border-color:rgba(221,119,104,.42);background:rgba(221,119,104,.10)}
+  .hero.offline .phone svg{color:var(--danger)}
+
   .sec{margin-top:26px}
   .sec-h{display:flex;align-items:baseline;gap:9px;margin:0 0 12px}
   .sec-h h2{margin:0;font-size:13.5px;font-weight:600;letter-spacing:.07em;color:var(--ink)}
@@ -664,7 +669,7 @@
       const d0 = s.devices[0];
       hint = '检测到 ' + d0.serial + '，但状态是 ' + d0.state + '。请在手机上点「允许 USB 调试」。';
     } else {
-      hint = s.error ? s.error : '插上 USB → 手机上点「允许 USB 调试」。连上后这里会自动变。';
+      hint = s.error ? s.error : '插上 USB → 手机上点「允许 USB 调试」。刚才还连着的，多半是线松了/断了，换根线或换个口再插一次。';
     }
     $('#devHint').textContent = hint;
 
@@ -679,6 +684,9 @@
     $('#btnTap').disabled = busy || !ready;
     refreshPadDisabled(busy);
     $('#notice').hidden = !!(ready || running);
+
+    // USB 掉了就把整块摘要变红，别让人以为只是"没连"，实际是线断了
+    document.querySelector('.hero').classList.toggle('offline', !ready && !running);
 
     // 多台设备时让用户挑一台，记住上次的选择
     const devs = (s.devices || []).filter((x) => x.state === 'device');
