@@ -157,6 +157,19 @@
     font-size:11.5px;color:var(--faint);text-align:center;
   }
 
+  .acts-list{display:grid;gap:4px;border:1px solid var(--line);border-radius:10px;padding:8px;background:#08090b}
+  .shot-empty-line{padding:10px;font-size:11.5px;color:var(--faint);text-align:center}
+  .ar{
+    display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:6px;
+    font-size:11px;font-family:"SF Mono",Menlo,monospace;color:var(--muted);
+  }
+  .ar:nth-child(odd){background:rgba(255,255,255,.02)}
+  .ar .t{color:var(--faint);flex:0 0 62px}
+  .ar .n{color:var(--ink);flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ar .r{flex:0 0 auto;font-size:10.5px}
+  .ar .r.ok{color:var(--ok)}
+  .ar .r.bad{color:var(--danger)}
+
   .logbox{margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#08090b}
   .logbox .lh{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -318,6 +331,11 @@
     </div>
     <div class="shots" id="shots"></div>
     <div class="shots-empty" id="shotsEmpty">还没有截图。点「截一张」或按 <kbd>S</kbd>。</div>
+  </section>
+
+  <section class="sec">
+    <div class="sec-h"><h2>最近按键</h2><span class="n" id="actHint">点一下就记一笔，能看出是没发出去还是 App 不理</span></div>
+    <div class="acts-list" id="acts"><div class="shot-empty-line">还没有按键记录</div></div>
   </section>
 
   <section class="sec">
@@ -728,6 +746,27 @@
 
   let onlyKey = false;
 
+  async function loadActions() {
+    try {
+      const d = await api('/api/cast/actions?limit=14');
+      const list = (d.actions || []).slice().reverse();
+      const box = $('#acts');
+      if (!list.length) {
+        box.innerHTML = '<div class="shot-empty-line">还没有按键记录</div>';
+        return;
+      }
+      box.innerHTML = list.map((a) => {
+        const t = new Date(a.at);
+        const hh = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ':' + String(t.getSeconds()).padStart(2, '0');
+        const name = a.label || a.key || (a.kind === 'tap' ? '点 (' + a.x + ',' + a.y + ')' : a.kind);
+        const code = a.code != null ? ' · ' + a.code : '';
+        return '<div class="ar"><span class="t">' + hh + '</span>' +
+          '<span class="n">' + esc(name) + code + '</span>' +
+          '<span class="r ' + (a.ok ? 'ok' : 'bad') + '">' + (a.ok ? '已发出' : esc(a.message || '失败')) + '</span></div>';
+      }).join('');
+    } catch {}
+  }
+
   async function refreshLog() {
     try {
       const d = await api('/api/cast/log?lines=140' + (onlyKey ? '&filter=important' : ''));
@@ -924,6 +963,7 @@
     tickTimer = setInterval(() => {
       if (document.hidden) return;
       refresh();
+      loadActions();
       // 截图墙每 5 个状态周期补刷一次，别跟 3 秒轮询一个频率去读目录
       if (++shotTick % 5 === 0) loadShots();
     }, 3000);
@@ -949,6 +989,7 @@
       tgAudio.classList.toggle('on', !!st.config.noAudio);
     }
     await loadShots();
+    await loadActions();
     startTick();
   })();
 })();
