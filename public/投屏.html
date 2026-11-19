@@ -866,13 +866,15 @@
     if (inEditableTarget(e.target)) return;
 
     /* Esc：① 大图开着 → 只关大图，不发任何请求；② 无大图且正在投屏 → 停止投屏；
-       ③ 无大图且未投屏 → 什么都不做（不发请求、不弹 toast、不改按钮状态）。 */
+       ③ 无大图且未投屏 → 只给一句提示，不发请求、不改任何状态。 */
     if (e.key === 'Escape') {
       if ($('#lb').classList.contains('on')) {
         closeLb();
         e.preventDefault();
       } else if (isRunning()) {
         act(() => api('/api/cast/stop', { method: 'POST', body: '{}' }));
+      } else {
+        toast('当前没有投屏，没什么可退的；按空格开始');
       }
       return;
     }
@@ -886,16 +888,19 @@
       e.preventDefault();
       if (isRunning()) hit('playpause', '播放/暂停');
       else if (!btnStart.disabled) btnStart.click();
+      else toast(state && state.device ? '正在检查设备，稍等一下' : '没有可用设备，先插 USB 并在手机上点「允许 USB 调试」', 'bad');
       return;
     }
     if (e.key === 'ArrowLeft') {
       e.preventDefault();
       if (state && state.device) hit('rewind', '快退');
+      else toast('没有可用设备，快退发不出去', 'bad');
       return;
     }
     if (e.key === 'ArrowRight') {
       e.preventDefault();
       if (state && state.device) hit('fastforward', '快进');
+      else toast('没有可用设备，快进发不出去', 'bad');
       return;
     }
     if (k === 's' && !$('#btnShot').disabled) { e.preventDefault(); $('#btnShot').click(); }
