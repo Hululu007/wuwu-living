@@ -300,6 +300,9 @@
   <section class="sec">
     <div class="sec-h"><h2>遥控</h2><span class="n" id="padHint">连着手机就能用，不用伸手去碰</span></div>
     <div class="pad" id="pad"></div>
+    <div class="chips-row">
+      <button class="chip" id="btnTap" type="button">点画面中央<span class="sub">媒体键不认的 App 用这个暂停</span></button>
+    </div>
     <div class="pad-note">媒体键不灵时用方向键，视频里就是后退/前进。</div>
     <div class="vol">
       <span class="vol-l">手机媒体音量</span>
@@ -655,6 +658,7 @@
     btnStop.disabled = busy || !running;
     btnRecord.disabled = busy || running || !ready;
     $('#btnShot').disabled = busy || !ready;
+    $('#btnTap').disabled = busy || !ready;
     refreshPadDisabled(busy);
     $('#notice').hidden = !!(ready || running);
 
@@ -768,6 +772,10 @@
   }
 
   /* ── 按钮 ── */
+  $('#btnTap').addEventListener('click', () => {
+    act(() => api('/api/cast/tap', { method: 'POST', body: JSON.stringify({ serial }) }));
+  });
+
   $('#devSel').addEventListener('change', () => {
     serial = $('#devSel').value;
     localStorage.setItem('ww.cast.serial', serial);
