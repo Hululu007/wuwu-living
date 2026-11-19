@@ -228,6 +228,9 @@
     font-family:"SF Mono",Menlo,monospace;font-size:10px;border:1px solid var(--line);
     border-radius:4px;padding:1px 5px;color:var(--muted);margin:0 1px;
   }
+  .pad-note{margin-top:9px;font-size:10.5px;color:var(--faint);line-height:1.7}
+  .dirty-hint{margin-top:9px;font-size:11px;color:var(--a);line-height:1.7}
+  .dirty-hint[hidden]{display:none}
 </style>
 </head>
 <body data-room="cast">
@@ -284,17 +287,20 @@
     <div class="acts">
       <button class="big primary" id="btnStart" type="button">开始投屏</button>
       <button class="big ghost" id="btnStop" type="button" disabled>停止</button>
+      <button class="big ghost" id="btnApply" type="button" hidden>应用并重启</button>
       <button class="big ghost" id="btnRecord" type="button">录一份</button>
       <input class="extra" id="extra" type="text" placeholder="额外参数，例如 --window-title 我的手机" spellcheck="false">
     </div>
+    <div class="dirty-hint" id="dirtyHint" hidden>设置已改，点「应用并重启」让新参数立刻生效。</div>
     <div class="kbd-hint">
-      快捷键：<kbd>空格</kbd> 开始/停止 · <kbd>S</kbd> 截图 · <kbd>R</kbd> 录一份 · <kbd>B</kbd> 返回 · <kbd>H</kbd> 主页
+      快捷键：<kbd>空格</kbd> 播放/暂停（未投屏时开始） · <kbd>←</kbd> 快退 · <kbd>→</kbd> 快进 · <kbd>S</kbd> 截图 · <kbd>R</kbd> 录一份 · <kbd>B</kbd> 返回 · <kbd>H</kbd> 主页 · <kbd>Esc</kbd> 关大图 / 停止投屏
     </div>
   </section>
 
   <section class="sec">
     <div class="sec-h"><h2>遥控</h2><span class="n" id="padHint">连着手机就能用，不用伸手去碰</span></div>
     <div class="pad" id="pad"></div>
+    <div class="pad-note">媒体键不灵时用方向键，视频里就是后退/前进。</div>
     <div class="vol">
       <span class="vol-l">手机媒体音量</span>
       <input type="range" id="volRange" min="0" max="100" step="1" value="0" disabled>
@@ -346,8 +352,10 @@
   const tgAudio = $('#tgAudio');
   const btnStart = $('#btnStart');
   const btnStop = $('#btnStop');
+  const btnApply = $('#btnApply');
   const btnRecord = $('#btnRecord');
   const extraEl = $('#extra');
+  const dirtyHint = $('#dirtyHint');
 
   let state = null;
   let volFetched = false;
@@ -399,6 +407,7 @@
         picked = p.arg;
         localStorage.setItem('ww.cast.preset', picked);
         for (const x of presetsEl.children) x.classList.toggle('on', x.dataset.arg === picked);
+        refreshApplyUi();
       });
       presetsEl.appendChild(b);
     }
@@ -422,6 +431,7 @@
         profile = p.arg;
         localStorage.setItem('ww.cast.profile', profile);
         for (const x of profilesEl.children) x.classList.toggle('on', x.dataset.arg === profile);
+        refreshApplyUi();
       });
       profilesEl.appendChild(b);
     }
@@ -432,19 +442,30 @@
     padEl.innerHTML = '';
     const order = ['back', 'home', 'recents', 'power', 'wake', 'sleep'];
     const volOrder = ['volup', 'voldown', 'mute'];
+    const mediaOrder = ['prev', 'rewind', 'playpause', 'fastforward', 'next'];
+    const dpadOrder = ['dpad_left', 'dpad_center', 'dpad_right'];
+    const LOCAL_LABEL = {
+      prev: '上一曲', rewind: '快退', playpause: '播放/暂停', fastforward: '快进', next: '下一曲',
+      dpad_left: '←', dpad_center: '确定', dpad_right: '→',
+    };
     const byKey = {};
     for (const k of keys || []) byKey[k.key] = k;
-    for (const k of order) addKey(k, byKey[k] ? byKey[k].label : k);
+    const labelOf = (k) => (byKey[k] ? byKey[k].label : LOCAL_LABEL[k] || k);
+    for (const k of order) addKey(k, labelOf(k));
     padEl.appendChild(el('div', 'sep'));
-    for (const k of volOrder) addKey(k, byKey[k] ? byKey[k].label : k);
+    for (const k of volOrder) addKey(k, labelOf(k));
+    padEl.appendChild(el('div', 'sep'));
+    for (const k of mediaOrder) addKey(k, labelOf(k), 'media');
+    padEl.appendChild(el('div', 'sep'));
+    for (const k of dpadOrder) addKey(k, labelOf(k), 'dpad');
     padEl.appendChild(el('div', 'sep'));
     addKey('rot90', '转 90°');
     addKey('rot0', '转正');
 
-    function addKey(key, label) {
+    function addKey(key, label, cls) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'key';
+      b.className = 'key' + (cls ? ' ' + cls : '');
       b.dataset.key = key;
       b.textContent = label;
       b.addEventListener('click', () => hit(key, label));
@@ -483,6 +504,41 @@
     for (const b of padEl.querySelectorAll('.key')) {
       b.disabled = force || !ready;
     }
+  }
+
+  /* ── 设置差异：页面当前选择 vs 正在生效的 session.opts ── */
+  function currentSettings() {
+    return {
+      preset: picked,
+      profile,
+      alwaysOnTop: tgTop.classList.contains('on'),
+      noAudio: tgAudio.classList.contains('on'),
+      extra: extraEl.value.trim(),
+    };
+  }
+  function effectiveSettings() {
+    const session = (state && state.session) || {};
+    const opts = session.opts || session;
+    return {
+      preset: opts.preset || '',
+      profile: opts.profile || '',
+      alwaysOnTop: !!opts.alwaysOnTop,
+      noAudio: !!opts.noAudio,
+      extra: (opts.extra || '').trim(),
+    };
+  }
+  function isDirty() {
+    if (!(state && state.session && state.session.running)) return false;
+    const c = currentSettings();
+    const e = effectiveSettings();
+    return c.preset !== e.preset || c.profile !== e.profile ||
+      c.alwaysOnTop !== e.alwaysOnTop || c.noAudio !== e.noAudio || c.extra !== e.extra;
+  }
+  function refreshApplyUi() {
+    const dirty = isDirty();
+    btnApply.hidden = !dirty;
+    btnApply.disabled = !dirty || busy;
+    dirtyHint.hidden = !dirty;
   }
 
   /* ── 音量 ── */
@@ -642,6 +698,7 @@
     if (!padEl.children.length) renderPad(s.keys || []);
     // 必须在 pad 建好之后再算一次可用状态，否则首屏按钮是活的
     refreshPadDisabled(busy);
+    refreshApplyUi();
 
     scheduleLog(running);
   }
@@ -693,7 +750,7 @@
   async function act(fn) {
     if (busy) return;
     busy = true;
-    btnStart.disabled = btnStop.disabled = btnRecord.disabled = true;
+    btnStart.disabled = btnStop.disabled = btnRecord.disabled = btnApply.disabled = true;
     $('#btnShot').disabled = true;
     refreshPadDisabled(true);
     try {
@@ -737,8 +794,32 @@
     act(() => api('/api/cast/shot', { method: 'POST', body: JSON.stringify({ serial }) })).then(() => loadShots());
   });
 
-  tgTop.addEventListener('click', () => tgTop.classList.toggle('on'));
-  tgAudio.addEventListener('click', () => tgAudio.classList.toggle('on'));
+  tgTop.addEventListener('click', () => { tgTop.classList.toggle('on'); refreshApplyUi(); });
+  tgAudio.addEventListener('click', () => { tgAudio.classList.toggle('on'); refreshApplyUi(); });
+  extraEl.addEventListener('input', refreshApplyUi);
+
+  /* 应用并重启：只在用户明确点击时才 POST /api/cast/apply，绝不自动打断当前窗口 */
+  btnApply.addEventListener('click', () => {
+    if (busy) return;
+    busy = true;
+    btnStart.disabled = btnStop.disabled = btnRecord.disabled = btnApply.disabled = true;
+    refreshPadDisabled(true);
+    const c = currentSettings();
+    api('/api/cast/apply', {
+      method: 'POST',
+      body: JSON.stringify(Object.assign({ serial }, c)),
+    })
+      .then((r) => {
+        if (r.ok === false) throw new Error(r.message || '应用失败');
+        toast(r.message || '已应用并重启', 'good');
+      })
+      .catch((e) => toast(e.message || '应用失败', 'bad'))
+      .finally(async () => {
+        busy = false;
+        await refresh();
+        refreshApplyUi();
+      });
+  });
 
   $('#btnLogRefresh').addEventListener('click', refreshLog);
   $('#btnOnlyKey').addEventListener('click', () => {
@@ -770,20 +851,51 @@
 
   $('#lbClose').addEventListener('click', closeLb);
   $('#lb').addEventListener('click', (e) => { if (e.target.id === 'lb') closeLb(); });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && $('#lb').classList.contains('on')) { closeLb(); return; }
-  });
 
-  /* ── 键盘快捷键 ── */
+  /* ── 键盘：Esc 三级语义 + 快捷键，只挂一个 keydown 监听器，避免同一按键被双触发 ── */
+  function inEditableTarget(t) {
+    if (!t) return false;
+    const tag = (t.tagName || '').toUpperCase();
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return true;
+    if (t.isContentEditable) return true;
+    return false;
+  }
+  const isRunning = () => !!(state && state.session && state.session.running);
+
   document.addEventListener('keydown', (e) => {
+    if (inEditableTarget(e.target)) return;
+
+    /* Esc：① 大图开着 → 只关大图，不发任何请求；② 无大图且正在投屏 → 停止投屏；
+       ③ 无大图且未投屏 → 什么都不做（不发请求、不弹 toast、不改按钮状态）。 */
+    if (e.key === 'Escape') {
+      if ($('#lb').classList.contains('on')) {
+        closeLb();
+        e.preventDefault();
+      } else if (isRunning()) {
+        act(() => api('/api/cast/stop', { method: 'POST', body: '{}' }));
+      }
+      return;
+    }
+
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '')) return;
     if ($('#lb').classList.contains('on')) return;
+
     const k = e.key.toLowerCase();
+    /* 空格：投屏中 = 播放/暂停（不再误关窗口）；未投屏时仍可开始 */
     if (e.key === ' ') {
       e.preventDefault();
-      if (!btnStop.disabled) btnStop.click();
+      if (isRunning()) hit('playpause', '播放/暂停');
       else if (!btnStart.disabled) btnStart.click();
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (state && state.device) hit('rewind', '快退');
+      return;
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (state && state.device) hit('fastforward', '快进');
       return;
     }
     if (k === 's' && !$('#btnShot').disabled) { e.preventDefault(); $('#btnShot').click(); }
