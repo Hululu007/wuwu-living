@@ -15,14 +15,14 @@
   .task:hover{border-color:var(--edge)}
   .task-h{display:flex;align-items:baseline;gap:9px;min-width:0}
   .task-h b{font-size:14.5px;font-weight:600;letter-spacing:.02em;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .task-h .kind{font-size:10px;color:var(--a);background:var(--soft);padding:2px 6px;border-radius:4px;flex:0 0 auto}
-  .task-h .when{margin-left:auto;font-size:10.5px;color:var(--faint);flex:0 0 auto}
-  .state{font-size:10.5px;letter-spacing:.04em;padding:2px 8px;border-radius:999px;flex:0 0 auto}
+  .task-h .kind{font-size:11px;color:var(--a);background:var(--soft);padding:2px 6px;border-radius:4px;flex:0 0 auto}
+  .task-h .when{margin-left:auto;font-size:11px;color:var(--faint);flex:0 0 auto}
+  .state{font-size:11px;letter-spacing:.04em;padding:2px 8px;border-radius:999px;flex:0 0 auto}
   .state.active{background:var(--soft);color:var(--a)}
   .state.waiting{background:var(--soft);color:var(--a)}
-  .state.paused{background:rgba(214,160,94,.14);color:var(--warn)}
-  .state.done{background:rgba(127,187,140,.13);color:var(--ok)}
-  .state.error{background:rgba(221,119,104,.13);color:var(--danger)}
+  .state.paused{background:rgba(202,181,73,.14);color:var(--warn)}
+  .state.done{background:rgba(79,181,131,.13);color:var(--ok)}
+  .state.error{background:rgba(222,66,23,.13);color:var(--danger)}
   .task-m{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
   .task-m .bar{flex:1;min-width:120px}
   .task-m .num{font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -30,7 +30,7 @@
   .task-err{font-size:11.5px;color:var(--danger);line-height:1.7}
   .task-note{font-size:11.5px;color:var(--faint);line-height:1.7}
   .task-f{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-  .task-f .src{font-size:10.5px;color:var(--faint);margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+  .task-f .src{font-size:11px;color:var(--faint);margin-right:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
   .filters{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
   .toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
   .stat-inline{font-size:11px;color:var(--faint);letter-spacing:.04em}
@@ -48,7 +48,7 @@
 
 <div class="wrap">
   <header class="top">
-    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="回客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
     <div class="titlebar">
       <h1><i></i>下载中心</h1>
       <span class="sub">直链流式落盘，磁力排队拉取，断点可以续</span>
@@ -63,7 +63,7 @@
   </header>
 
   <section class="lede">
-    <p>直链走 Node 自带 fetch 边下边写，临时文件 .part，下完再改名；磁力用 webtorrent 惰性加载，没装好也不影响直链。<br>进度、速度、剩余时间都在这一面墙上看。</p>
+    <p>直链、磁力都能下；进度、速度、剩余时间，都在这面墙上看。</p>
     <div class="figs">
       <div class="fig"><b id="fTotal">—</b><span>全部任务</span></div>
       <div class="fig"><b id="fActive">—</b><span>进行中</span></div>
@@ -151,19 +151,15 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/assets/toast.js"></script>
+<script src="/assets/notify-panel.js" data-ww-history="消息记录"></script>
+  <script src="/assets/fetch-timeout.js"></script>
 <script>
 (function () {
   'use strict';
   var S = { filter: '', items: [], totals: null, magnet: null, dir: '', deleting: null, saving: false };
   var $ = function (s, el) { return (el || document).querySelector(s); };
 
-  function toast(msg, err) {
-    var t = $('#toast');
-    t.textContent = msg;
-    t.className = 'toast on' + (err ? ' err' : '');
-    clearTimeout(toast._t);
-    toast._t = setTimeout(function () { t.className = 'toast'; }, 2400);
-  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -199,7 +195,7 @@
   }
 
   function api(path, body) {
-    return fetch('/api/download' + path, body === undefined
+    return wwFetch('/api/download' + path, body === undefined
       ? { cache: 'no-store' }
       : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json(); });
@@ -234,7 +230,7 @@
 
   function openLibrary(t) {
     var abs = t.file && t.file.path;
-    if (!abs) { toast('还没有落盘文件', true); return; }
+    if (!abs) { toast('还没有落盘文件', 'err'); return; }
     location.href = location.origin + '/library/?focus=' + encodeURIComponent(abs);
   }
 
@@ -303,6 +299,7 @@
   }
 
   function paint() {
+    listLoading = false;
     renderFilters();
     var list = $('#list');
     var items = S.filter ? S.items.filter(function (t) { return t.state === S.filter; }) : S.items;
@@ -327,15 +324,30 @@
         if (act === 'library') { var t2 = findTask(id); if (t2) openLibrary(t2); return; }
         api('/' + act, { id: id }).then(function (d) {
           if (!d.ok) throw new Error(d.message || '操作失败');
-          toast(act === 'pause' ? '已暂停' : '已继续排队');
+          toast(act === 'pause' ? '已暂停' : '已继续排队', 'good');
           load();
-        }).catch(function (err) { toast(err.message, true); });
+        }).catch(function (err) { toast(wwDescribeError(err), 'err'); });
       };
     });
   }
 
+  // ★ 2026-11-22 补「加载中」态：原来 #list 是空 div，fetch 在途的那几秒（实测 1–7s）
+  //   页面一片空白，用户无法区分「在加载」和「没有任务」。空态文案本来就有，缺的只是加载态。
+  //   不使用 setTimeout 兜底：占位在请求发出前写入，在 then/catch 里由 paint()/错误态覆盖。
+  var listLoading = false;
+  function showListLoading() {
+    var list = $('#list');
+    if (!list || listLoading) return;
+    listLoading = true;
+    list.className = '';
+    list.innerHTML = '<div class="loading" role="status" aria-live="polite">' +
+      '<span class="spinner" aria-hidden="true"></span><span>正在读取任务…</span></div>';
+  }
+
   function load() {
+    showListLoading();
     api('/list').then(function (d) {
+      listLoading = false;
       if (!d.ok) throw new Error(d.message || 'fail');
       S.items = d.items || [];
       S.totals = d.totals || null;
@@ -352,8 +364,9 @@
       paint();
       $('#updated').textContent = '更新于 ' + new Date().toTimeString().slice(0, 8);
     }).catch(function (e) {
+      listLoading = false;
       $('#list').className = '';
-      $('#list').innerHTML = '<div class="empty"><b>任务没读出来</b><span>' + esc(e.message || e) + '</span></div>';
+      $('#list').innerHTML = '<div class="empty error"><b>任务没读出来</b><span>' + esc(e.message || e) + '</span></div>';
     });
   }
 
@@ -368,15 +381,15 @@
 
   function saveAdd() {
     var url = $('#nUrl').value.trim(), name = $('#nName').value.trim(), magnet = $('#nMagnet').value.trim();
-    if (!url && !magnet) { toast('给一个直链或磁力链接', true); return; }
+    if (!url && !magnet) { toast('给一个直链或磁力链接', 'err'); return; }
     var payload = magnet ? { magnet: magnet } : { url: url, name: name };
     $('#btnSave').disabled = true;
     api('/add', payload).then(function (d) {
       if (!d.ok) throw new Error(d.message || '加不进去');
       closeAdd();
-      toast('已加入下载');
+      toast('已加入下载', 'good');
       load();
-    }).catch(function (e) { toast(e.message, true); })
+    }).catch(function (e) { toast(wwDescribeError(e), 'err'); })
       .finally(function () { $('#btnSave').disabled = false; });
   }
 
@@ -401,9 +414,9 @@
     api('/delete', { id: id, removeFile: removeFile }).then(function (d) {
       if (!d.ok) throw new Error(d.message || '删除失败');
       closeDel();
-      toast(removeFile ? '任务和文件都删了' : '只删了任务记录');
+      toast(removeFile ? '任务和文件都删了' : '只删了任务记录', 'good');
       load();
-    }).catch(function (e) { toast(e.message, true); });
+    }).catch(function (e) { toast(wwDescribeError(e), 'err'); });
   }
 
   $('#btnNew').onclick = openAdd;
@@ -420,9 +433,13 @@
   $('#btnClear').onclick = function () {
     api('/clear-done').then(function (d) {
       if (!d.ok) throw new Error(d.message || '失败');
-      toast(d.removed ? '已清空 ' + d.removed + ' 条已完成记录' : '没有已完成的任务');
+      // ★ 2026-11-22：d.removed=0 不是失败，但也不该说成「已清空」——
+      //   两分支同色时用户无法区分「真清了 N 条」和「本来就没有」。
+      //   0 条用 info（第二参 '' 即默认样式），成功清空用 good，让两者可辨。
+      if (d.removed) toast('已清空 ' + d.removed + ' 条已完成记录', 'good');
+      else toast('没有已完成的任务', 'info');
       load();
-    }).catch(function (e) { toast(e.message, true); });
+    }).catch(function (e) { toast(wwDescribeError(e), 'err'); });
   };
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { closeAdd(); closeDel(); closePlayer(); }

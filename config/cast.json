@@ -4,5 +4,8 @@
   "scrcpyDir": "",
   "adb": "",
   "extraArgs": "",
-  "recordDir": "~/Movies"
+  "recordDir": "~/Movies",
+  "profile": "std",
+  "alwaysOnTop": false,
+  "noAudio": false
 }

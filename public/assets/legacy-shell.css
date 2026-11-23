@@ -8,7 +8,7 @@
   /* 与 room.css 同一套 token，旧前端也吃同一份 */
   --ww-bg:#0b0c0e;
   --ww-panel:#12141a;
-  --ww-ink:#efe9df;
+  --ww-ink:#efe9dd;
   --ww-muted:#918c83;
   --ww-faint:#5e5b55;
   --ww-line:rgba(239,233,223,.12);
@@ -55,7 +55,7 @@
   text-decoration:none;line-height:1;white-space:nowrap;flex:none;
   transition:color .15s var(--ww-ease),background .15s var(--ww-ease),border-color .15s var(--ww-ease);
 }
-.ww-bar .ww-home:hover{color:var(--ww-ink,#efe9df);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
+.ww-bar .ww-home:hover{color:var(--ww-ink,#efe9dd);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
 .ww-bar .ww-home svg{width:14px;height:14px;opacity:.8}
 /* 嵌入态（iframe 被舞台壳打开）：顶栏返回入口隐藏，舞台头那个才是唯一入口；双保险，按栏标记兜底 */
 html[data-embedded] .ww-home,

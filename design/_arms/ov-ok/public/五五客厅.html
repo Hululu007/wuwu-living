@@ -1,0 +1,27 @@
+<!doctype html><html><body>
+<a class="brand" href="/" aria-label="五五客厅首页"><span>55</span></a>
+<div class="directory">
+<div class="room-row" data-id="magnet" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="book" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="music" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="vod" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="download" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="library" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="notes" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="calendar" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="photos" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="cast" role="button" aria-label="打开房间"><span>房</span></div>
+</div>
+<a class="ww-home" href="/" title="回客厅" aria-label="回客厅"><span>回客厅</span></a>
+<div class="empty">暂无</div><div class="loading">加载中</div><div class="error">出错</div>
+<script>var CAP=5;var items=[1];var h=items.slice(0, CAP).join("");var m="还有 "+(items.length-CAP)+" 条";var ex={};var b=document.createElement("button");b.setAttribute("data-week-more","0");b.textContent=ex[0]?"收起":m;</script>
+<div class="na">该功能不可用</div>
+<script>
+
+fetch('/api/x').catch(function(e){toast(e.message)})
+</script>
+<script src="assets/toast.js"></script>
+<script src="assets/notify-panel.js"></script>
+<div class="empty unavailable"><b>服务没在运行</b><button type="button">启动</button></div>
+<button type="button" data-ww-history>消息</button>
+</body></html>

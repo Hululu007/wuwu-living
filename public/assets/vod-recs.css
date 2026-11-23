@@ -1,155 +1,364 @@
 /* ─────────────────────────────────────────────────────────────
    视频房推荐首页 · 注入到 /vod/ 页面
-   设计语言与客厅 public/assets/room.css 同一套 token：
-   深色底 #0b0c0e、主色 #A996DD、圆角 12px、宋体标题、统一阴影梯度。
-   本样式只挂在 #vr-board 子树下，不碰原页面其它节点。
+   与「听音乐」同一套暖黑、象牙、黄铜、珊瑚；
+   烟紫只做房主色的小面积点缀。
+   只挂在 #vr-board 子树，不碰原页面其它节点。
    ───────────────────────────────────────────────────────────── */
 
 #vr-board{
-  --vr-a:#A996DD;
-  --vr-soft:rgba(169,150,221,.13);
-  --vr-edge:rgba(169,150,221,.34);
-  --vr-glow:rgba(169,150,221,.40);
-  --vr-bg:#0b0c0e;
-  --vr-ink:#efe9df;
-  --vr-muted:#918c83;
-  --vr-faint:#5e5b55;
-  --vr-line:rgba(239,233,223,.12);
-  --vr-line2:rgba(239,233,223,.055);
-  --vr-card:rgba(255,255,255,.035);
-  --vr-r:12px;
-  --vr-sh:0 4px 20px rgba(0,0,0,.35);
+  --vr-a:#b9a6d3;
+  --vr-soft:rgba(185,166,211,.12);
+  --vr-edge:rgba(185,166,211,.32);
+  --vr-brass:#c4a36e;
+  --vr-brass-soft:rgba(196,163,110,.12);
+  --vr-coral:#dd7768;
+  --vr-coral-soft:rgba(221,119,104,.12);
+  --vr-bg:#0a0d0b;
+  --vr-ink:#efe9dd;
+  --vr-sub:#c8c0b2;
+  --vr-muted:#a8a196;
+  --vr-faint:#857f74;
+  --vr-line:rgba(239,233,221,.15);
+  --vr-line2:rgba(239,233,221,.07);
+  --vr-card:rgba(239,233,221,.035);
+  --vr-r:2px;
+  --vr-sh:0 18px 50px rgba(0,0,0,.4);
   --vr-serif:"Songti SC","STSong","Noto Serif SC",serif;
   --vr-sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
 
-  padding:20px 22px 34px;
-  color:var(--vr-ink);
-  font:14px/1.6 var(--vr-sans);
-  max-width:1080px;
+  max-width:1180px;
   margin:0 auto;
+  padding:26px 26px 48px;
+  color:var(--vr-ink);
+  font:13px/1.6 var(--vr-sans);
 }
 
-/* ── 顶部精选 ── */
-#vr-board .vr-feat{margin-bottom:26px}
+/* ── 编辑式开场 ── */
+#vr-board .vr-intro{
+  position:relative;
+  padding:8px 0 30px;
+  margin-bottom:22px;
+  border-bottom:1px solid var(--vr-line2);
+}
+#vr-board .vr-intro::after{
+  content:"";
+  position:absolute;left:0;bottom:-1px;
+  width:74px;height:1px;
+  background:linear-gradient(90deg,var(--vr-brass),transparent);
+}
+#vr-board .vr-eyebrow{
+  display:block;
+  color:var(--vr-a);
+  font-size:11px;
+  letter-spacing:.24em;
+  text-transform:uppercase;
+}
+#vr-board .vr-h1{
+  margin:14px 0 0;
+  font-family:var(--vr-serif);
+  font-size:clamp(30px,3.5vw,46px);
+  font-weight:400;
+  line-height:1.2;
+  letter-spacing:.05em;
+  color:var(--vr-ink);
+}
+#vr-board .vr-sub{
+  margin:13px 0 0;
+  color:var(--vr-sub);
+  font-size:12.5px;
+  line-height:1.9;
+  letter-spacing:.02em;
+}
+#vr-board .vr-stats{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:9px;
+  margin-top:20px;
+  color:var(--vr-muted);
+  font-size:11px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+#vr-board .vr-stats .on{
+  display:inline-flex;align-items:center;gap:6px;
+  color:var(--vr-brass);
+}
+#vr-board .vr-stats .on i{
+  width:5px;height:5px;border-radius:50%;background:var(--vr-brass);
+  box-shadow:0 0 0 2px var(--vr-brass-soft);
+}
+#vr-board .vr-stats .sep{color:var(--vr-faint);font-size:11px}
+
+/* ── 精选 ── */
+#vr-board .vr-feat{margin-bottom:28px}
 #vr-board .vr-feat-h{
-  display:flex;align-items:center;gap:10px;margin-bottom:13px;
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  margin-bottom:13px;
 }
 #vr-board .vr-feat-h .dot{
-  width:7px;height:7px;border-radius:50%;background:var(--vr-a);
-  box-shadow:0 0 0 4px var(--vr-soft);
+  width:4px;height:14px;
+  border-radius:0;
+  background:var(--vr-brass);
+  box-shadow:none;
 }
 #vr-board .vr-feat-h h2{
-  margin:0;font-family:var(--vr-serif);font-size:18px;font-weight:600;
-  letter-spacing:.12em;color:var(--vr-ink);
+  margin:0;
+  font-family:var(--vr-serif);
+  font-size:20px;
+  font-weight:400;
+  letter-spacing:.1em;
+  color:var(--vr-ink);
 }
-#vr-board .vr-feat-h .sub{font-size:11px;color:var(--vr-faint);letter-spacing:.06em}
+#vr-board .vr-feat-h .sub{
+  color:var(--vr-faint);
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
 
 #vr-board .vr-track{
-  display:flex;gap:14px;overflow-x:auto;padding:4px 2px 10px;
-  scroll-snap-type:x proximity;scrollbar-width:thin;
+  display:flex;
+  gap:14px;
+  overflow-x:auto;
+  padding:3px 2px 13px;
+  scroll-snap-type:x proximity;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(239,233,221,.16) transparent;
 }
 #vr-board .vr-track::-webkit-scrollbar{height:6px}
-#vr-board .vr-track::-webkit-scrollbar-thumb{background:#333c50;border-radius:5px}
+#vr-board .vr-track::-webkit-scrollbar-track{background:transparent}
+#vr-board .vr-track::-webkit-scrollbar-thumb{background:rgba(239,233,221,.16);border-radius:99px}
 
 /* ── 海报卡片 ── */
 #vr-board .vr-card{
-  flex:0 0 auto;cursor:pointer;scroll-snap-align:start;
-  width:124px;display:flex;flex-direction:column;gap:8px;
-  transition:transform .16s ease;
+  flex:0 0 auto;
+  width:132px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  cursor:pointer;
+  scroll-snap-align:start;
+  transition:transform .18s var(--ease, ease),opacity .18s var(--ease, ease);
 }
 #vr-board .vr-card:hover{transform:translateY(-3px)}
+#vr-board .vr-card:active{transform:translateY(-1px)}
 #vr-board .vr-card .poster{
-  position:relative;width:100%;aspect-ratio:2/3;border-radius:var(--vr-r);
-  overflow:hidden;background:linear-gradient(135deg,#1e2431,#262e40);
-  border:1px solid var(--vr-line);box-shadow:var(--vr-sh);
+  position:relative;
+  width:100%;
+  aspect-ratio:2/3;
+  border:1px solid var(--vr-line);
+  border-radius:2px;
+  overflow:hidden;
+  background:
+    linear-gradient(150deg,rgba(185,166,211,.18),rgba(196,163,110,.1) 62%,rgba(255,255,255,.025)),
+    #161a17;
+  box-shadow:var(--vr-sh);
 }
 #vr-board .vr-card .poster img{
   width:100%;height:100%;object-fit:cover;display:block;
+  transition:transform .5s var(--ease, ease),filter .3s var(--ease, ease);
 }
+#vr-board .vr-card:hover .poster img{transform:scale(1.035);filter:saturate(1.08)}
 #vr-board .vr-card .ph{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-family:var(--vr-serif);font-size:30px;color:var(--vr-faint);
-  background:linear-gradient(150deg,var(--vr-soft),rgba(169,150,221,.05));
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--vr-serif);
+  font-size:28px;
+  color:var(--vr-sub);
+  background:linear-gradient(150deg,rgba(185,166,211,.16),rgba(196,163,110,.08));
 }
 #vr-board .vr-card .badge{
   position:absolute;left:7px;top:7px;z-index:2;
-  font-size:10.5px;line-height:1.5;padding:1px 7px;border-radius:6px;
-  background:rgba(0,0,0,.55);color:var(--vr-ink);backdrop-filter:blur(4px);
+  padding:1px 6px;
+  border:1px solid rgba(239,233,221,.2);
+  border-radius:2px;
+  background:rgba(6,9,7,.62);
+  color:var(--vr-ink);
+  font-size:11px;
+  line-height:1.5;
+  letter-spacing:.02em;
+  backdrop-filter:blur(5px);
 }
-#vr-board .vr-card .badge.sc{color:#e8d9ff}
+#vr-board .vr-card .badge.sc{
+  border-color:rgba(196,163,110,.38);
+  background:rgba(30,25,15,.72);
+  color:#e7d3ac;
+}
+#vr-board .vr-card .badge.rm{
+  border-color:rgba(185,166,211,.3);
+  color:#ded2eb;
+}
 #vr-board .vr-card .meta{display:flex;flex-direction:column;gap:3px;min-width:0}
 #vr-board .vr-card .t{
-  font-size:12.5px;font-weight:600;line-height:1.35;color:var(--vr-ink);
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  color:var(--vr-ink);
+  font-family:var(--vr-serif);
+  font-size:13px;
+  font-weight:400;
+  line-height:1.4;
+  letter-spacing:.04em;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
 }
 #vr-board .vr-card .s{
-  font-size:11px;color:var(--vr-muted);white-space:nowrap;overflow:hidden;
+  color:var(--vr-muted);
+  font-size:11px;
+  line-height:1.5;
+  letter-spacing:.01em;
+  white-space:nowrap;
+  overflow:hidden;
   text-overflow:ellipsis;
 }
 
-/* 精选卡更大一号 */
-#vr-board .vr-feat .vr-card{width:168px}
-#vr-board .vr-feat .vr-card .t{font-size:13.5px}
+#vr-board .vr-feat .vr-card{width:174px}
+#vr-board .vr-feat .vr-card .t{font-size:14px}
 
 /* ── 分区 ── */
-#vr-board .vr-sec{margin-top:24px}
-#vr-board .vr-sec-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-#vr-board .vr-sec-h .dot{width:4px;height:4px;border-radius:50%;background:var(--vr-a);opacity:.8}
+#vr-board .vr-sec{margin-top:27px}
+#vr-board .vr-sec-h{
+  display:flex;align-items:baseline;gap:10px;
+  margin-bottom:11px;
+  padding-bottom:9px;
+  border-bottom:1px solid var(--vr-line2);
+}
+#vr-board .vr-sec-h .dot{
+  width:3px;height:10px;
+  border-radius:0;
+  background:var(--vr-a);
+  box-shadow:none;
+}
 #vr-board .vr-sec-h h2{
-  margin:0;font-size:13px;font-weight:600;letter-spacing:.14em;color:var(--vr-ink);
+  margin:0;
+  color:var(--vr-ink);
+  font-family:var(--vr-serif);
+  font-size:17px;
+  font-weight:400;
+  letter-spacing:.08em;
 }
-#vr-board .vr-sec-h .count{font-size:11px;color:var(--vr-faint);letter-spacing:.04em}
-#vr-board .vr-sec-h .src{margin-left:auto;font-size:10.5px;color:var(--vr-faint)}
-
-#vr-board .vr-row{display:flex;gap:13px;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:thin}
+#vr-board .vr-sec-h .count{color:var(--vr-faint);font-size:11px;letter-spacing:.06em}
+#vr-board .vr-sec-h .src{margin-left:auto;color:var(--vr-faint);font-size:11px;letter-spacing:.03em}
+#vr-board .vr-row{
+  display:flex;
+  gap:13px;
+  overflow-x:auto;
+  padding:2px 2px 9px;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(239,233,221,.14) transparent;
+}
 #vr-board .vr-row::-webkit-scrollbar{height:6px}
-#vr-board .vr-row::-webkit-scrollbar-thumb{background:#333c50;border-radius:5px}
-
+#vr-board .vr-row::-webkit-scrollbar-track{background:transparent}
+#vr-board .vr-row::-webkit-scrollbar-thumb{background:rgba(239,233,221,.14);border-radius:99px}
 #vr-board .vr-empty-sec{
-  font-size:12px;color:var(--vr-muted);padding:18px 4px;
-  border:1px dashed var(--vr-line2);border-radius:10px;text-align:center;
+  padding:20px 4px;
+  border:1px dashed var(--vr-line2);
+  border-radius:2px;
+  text-align:center;
+  color:var(--vr-muted);
+  font-size:11px;
 }
 
-/* ── 骨架条 ── */
+/* ── 骨架 ── */
 #vr-board .vr-skel{display:flex;gap:13px;overflow:hidden}
 #vr-board .vr-skel .vr-card{pointer-events:none}
+#vr-board .vr-skel .poster{
+  background:rgba(239,233,221,.05);
+  border-color:var(--vr-line2);
+  box-shadow:none;
+}
 #vr-board .vr-skel .poster::after{
-  content:"";position:absolute;inset:0;
-  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.07) 50%,transparent 70%);
-  background-size:200% 100%;animation:vr-shimmer 1.3s linear infinite;
+  content:"";
+  position:absolute;inset:0;
+  background:linear-gradient(100deg,transparent 28%,rgba(239,233,221,.11) 48%,transparent 68%);
+  background-size:220% 100%;
+  animation:vr-shimmer 1.5s linear infinite;
 }
-#vr-board .vr-skel .t::before{
-  content:"";display:block;height:11px;border-radius:5px;
-  background:rgba(255,255,255,.08);margin:3px 0;
+#vr-board .vr-skel .t{
+  width:74%;
+  height:11px;
+  margin:2px 0;
+  background:rgba(239,233,221,.08);
 }
-@keyframes vr-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+#vr-board .vr-skel .t::before{content:"";display:block;height:11px}
+#vr-board .vr-skel .s{
+  width:46%;height:9px;
+  background:rgba(239,233,221,.06);
+}
+@keyframes vr-shimmer{from{background-position:220% 0}to{background-position:-220% 0}}
 
 /* ── 失败 / 重试 ── */
 #vr-board .vr-error{
-  margin:18px 0;padding:26px 22px;border:1px solid var(--vr-line2);
-  border-radius:var(--vr-r);background:var(--vr-card);text-align:center;
+  margin:18px 0;
+  padding:30px 22px;
+  border:1px solid var(--vr-line2);
+  border-radius:2px;
+  background:var(--vr-card);
+  text-align:center;
 }
-#vr-board .vr-error .big{font-size:30px;opacity:.3;line-height:1}
-#vr-board .vr-error .h{font-family:var(--vr-serif);font-size:16px;margin:8px 0 4px}
-#vr-board .vr-error .s{font-size:12px;color:var(--vr-muted);max-width:380px;margin:0 auto}
+#vr-board .vr-error .big{
+  font-family:var(--vr-serif);
+  font-size:28px;
+  color:var(--vr-sub);
+  opacity:.7;
+  line-height:1;
+}
+#vr-board .vr-error .h{
+  margin:12px 0 5px;
+  font-family:var(--vr-serif);
+  font-size:17px;
+  letter-spacing:.06em;
+}
+#vr-board .vr-error .s{
+  max-width:420px;
+  margin:0 auto;
+  color:var(--vr-muted);
+  font-size:11px;
+  line-height:1.8;
+}
 #vr-board .vr-retry{
-  margin-top:14px;display:inline-flex;align-items:center;gap:6px;
-  font-size:12px;letter-spacing:.03em;color:var(--vr-ink);
-  padding:8px 15px;border:1px solid var(--vr-edge);border-radius:8px;
-  background:var(--vr-soft);transition:.16s;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:15px;
+  padding:8px 15px;
+  border:1px solid var(--vr-brass);
+  border-radius:2px;
+  background:var(--vr-brass-soft);
+  color:var(--vr-ink);
+  font-size:11px;
+  letter-spacing:.06em;
+  transition:.16s;
 }
-#vr-board .vr-retry:hover{border-color:var(--vr-a);background:rgba(169,150,221,.2)}
+#vr-board .vr-retry:hover{border-color:var(--vr-brass);background:rgba(196,163,110,.2)}
 
-/* 来源脚注 */
+/* ── 来源脚注 ── */
 #vr-board .vr-foot{
-  margin-top:26px;padding-top:14px;border-top:1px solid var(--vr-line2);
-  font-size:10.5px;color:var(--vr-faint);letter-spacing:.05em;line-height:1.7;
+  margin-top:28px;
+  padding-top:14px;
+  border-top:1px solid var(--vr-line2);
+  color:var(--vr-faint);
+  font-size:11px;
+  line-height:1.8;
+  letter-spacing:.04em;
 }
 
-/* 窄屏 */
+/* ── 窄屏 ── */
+@media (max-width:900px){
+  #vr-board{padding:22px 16px 38px}
+  #vr-board .vr-card{width:122px}
+  #vr-board .vr-feat .vr-card{width:158px}
+  #vr-board .vr-intro{padding-bottom:24px;margin-bottom:18px}
+}
 @media (max-width:480px){
-  #vr-board{padding:14px 14px 26px}
-  #vr-board .vr-card{width:104px}
-  #vr-board .vr-feat .vr-card{width:138px}
-  #vr-board .vr-sec{margin-top:18px}
+  #vr-board{padding:16px 14px 28px}
+  #vr-board .vr-card{width:108px}
+  #vr-board .vr-feat .vr-card{width:142px}
+  #vr-board .vr-sec{margin-top:19px}
+  #vr-board .vr-feat-h h2{font-size:18px}
+  #vr-board .vr-sec-h h2{font-size:15px}
+  #vr-board .vr-card .t{font-size:12px}
+  #vr-board .vr-card .s{font-size:11px}
 }

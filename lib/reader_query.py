@@ -47,6 +47,14 @@ try:
                 "enabled": obj.get("enabled", True) is not False,
             })
         out = {"items": items, "query": q}
+    elif mode == "groups":
+        rows = cur.execute(
+            "select trim(coalesce(json_extract(json,'$.bookSourceGroup'),'')) as g, count(*) as c "
+            "from book_sources "
+            "where trim(coalesce(json_extract(json,'$.bookSourceGroup'),'')) <> '' "
+            "group by g order by c desc, g asc limit 60"
+        ).fetchall()
+        out = {"groups": [{"name": r[0], "count": int(r[1])} for r in rows]}
     elif mode == "group":
         target = arg.strip()
         items = []
@@ -88,23 +96,18 @@ try:
         except Exception:
             out["todaySeconds"] = 0
 
-        counts = {}
+        # 分组「数量」用 SQL 聚合，不把 7538 行 / 23MB json 拉进 Python 逐条 json.loads。
+        # 实测：Python 逐条解析 0.97–1.13s，SQL count(distinct json_extract(...)) 0.25–0.37s。
+        # 分组「明细」不再随 info 下发（只有书房弹层用得到），改走 mode=groups 按需拉。
         try:
-            for name, raw in cur.execute("select book_source_name, json from book_sources"):
-                try:
-                    obj = json.loads(raw or "{}")
-                except Exception:
-                    obj = {}
-                g = (obj.get("bookSourceGroup") or "").strip()
-                if g:
-                    counts[g] = counts.get(g, 0) + 1
+            out["groupTotal"] = int(cur.execute(
+                "select count(distinct trim(coalesce(json_extract(json,'$.bookSourceGroup'),''))) "
+                "from book_sources "
+                "where trim(coalesce(json_extract(json,'$.bookSourceGroup'),'')) <> ''"
+            ).fetchone()[0] or 0)
         except Exception:
-            pass
-        out["groupTotal"] = len(counts)
-        out["groups"] = [
-            {"name": k, "count": v}
-            for k, v in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:18]
-        ]
+            out["groupTotal"] = 0
+        out["groups"] = []
 
     con.close()
 except Exception as e:

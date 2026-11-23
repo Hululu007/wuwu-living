@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0d0b">
+<title>五五客厅 · 十间房，一套服务</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='30' font-family='serif' fill='%23efe9df' text-anchor='middle'%3E55%3C/text%3E%3C/svg%3E">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   五五客厅 · 私人目录
+   一套暖黑底、象牙字、黄铜线；十间房做成十条可读的目录，不做门。
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --bg:var(--bg);
+  --ink:var(--ink);
+  --muted:var(--muted);
+  --faint:var(--faint);
+  --line:rgba(239,233,221,.18);
+  --line2:rgba(239,233,221,.085);
+  --brass:var(--brass);
+  --brass-soft:rgba(196,163,110,.12);
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --serif:"Songti SC","STSong","Noto Serif SC",serif;
+  --ok:var(--ok);
+  --magnet:var(--magnet);
+  --book:var(--book);
+  --music:var(--music);
+  --vod:var(--vod);
+  --download:var(--download);
+  --library:var(--library);
+  --notes:var(--notes);
+  --calendar:var(--calendar);
+  --photos:var(--photos);
+  --cast:var(--cast);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{background:var(--bg)}
+body{
+  min-height:100vh;color:var(--ink);font:14px/1.6 var(--sans);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  background:
+    radial-gradient(1100px 760px at 4% -18%, rgba(196,163,110,.105), transparent 62%),
+    radial-gradient(980px 680px at 100% 2%, rgba(126,166,224,.055), transparent 62%),
+    radial-gradient(900px 700px at 52% 112%, rgba(202,181,73,.045), transparent 68%),
+    linear-gradient(180deg,#0b0e0c 0%,#090c0a 54%,var(--bg) 100%);
+}
+body.in-stage{overflow:hidden}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+h1,h2,h3,p{margin:0}
+img,svg{display:block}
+::selection{background:rgba(196,163,110,.26);color:var(--ink)}
+*:focus-visible{outline:1px solid rgba(239,233,221,.45);outline-offset:3px}
+
+.grain{
+  position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.048;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+}
+
+.page{
+  position:relative;z-index:2;max-width:1340px;margin:0 auto;
+  padding:30px 44px 26px;min-height:100vh;display:flex;flex-direction:column;
+}
+
+/* ── 顶栏 ── */
+.top{
+  display:flex;align-items:center;justify-content:space-between;gap:24px;
+  padding-bottom:18px;border-bottom:1px solid var(--line2);
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.seal{
+  width:34px;height:34px;flex:0 0 auto;display:grid;place-items:center;
+  font-family:var(--serif);font-size:15px;font-weight:600;letter-spacing:.02em;color:var(--brass);
+  border:1px solid rgba(196,163,110,.42);background:rgba(196,163,110,.055);border-radius:1px;
+}
+.brand-text b{display:block;font-size:15px;font-weight:600;letter-spacing:.1em;line-height:1.2}
+.brand-text i{display:block;font-style:normal;font-size:11px;letter-spacing:.1em;color:var(--faint);margin-top:3px}
+.top-right{display:flex;align-items:center;gap:20px}
+.net{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);white-space:nowrap;letter-spacing:.03em}
+.net i{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(131,182,142,.11);flex:0 0 auto}
+.net.off{color:var(--faint)}
+.net.off i{background:var(--faint);box-shadow:none}
+.btn-all{
+  font-size:11px;letter-spacing:.07em;color:var(--ink);padding:7px 12px;
+  border:1px solid var(--line);border-radius:2px;background:transparent;transition:.2s;
+}
+.btn-all:hover{color:var(--brass);border-color:rgba(196,163,110,.48);background:var(--brass-soft)}
+/* 失败态重试：只在 .catch 分支显示；配色全部走 token，不写裸色值 */
+.btn-retry{
+  font-size:11px;letter-spacing:.07em;color:var(--brass);padding:6px 10px;
+  border:1px solid var(--brass-soft);border-radius:2px;background:var(--brass-soft);
+  transition:.2s;cursor:pointer;margin-left:8px;
+}
+.btn-retry:hover{color:var(--ink);border-color:rgba(196,163,110,.48)}
+.btn-retry[hidden]{display:none}
+/* 失败态：门名与数字恢复正常可见（骨架只在真正加载中生效） */
+body.load-failed .room-row .fig b,
+body.load-failed .entry-main{color:inherit}
+body.load-failed .room-row .fig b::after,
+body.load-failed .entry-main::after{content:none}
+body.load-failed .status{opacity:1}
+.clock{text-align:right;min-width:72px;padding-left:18px;border-left:1px solid var(--line2)}
+.clock b{display:block;font-size:15px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:.04em;line-height:1.15}
+.clock span{display:block;font-size:11px;color:var(--faint);margin-top:2px;letter-spacing:.03em}
+
+/* ── 左右结构 ── */
+.layout{
+  flex:1;display:grid;
+  grid-template-columns:minmax(328px,.72fr) minmax(0,1.28fr);
+  grid-template-areas:"intro directory" "today directory";
+  grid-template-rows:auto 1fr;
+  column-gap:clamp(48px,6vw,96px);
+  padding:34px 0 42px;
+}
+.intro{grid-area:intro;max-width:448px;padding-top:18px;animation:enter .75s .03s cubic-bezier(.2,.7,.3,1) both}
+.intro h1{
+  font-family:var(--serif);font-size:clamp(48px,4.9vw,72px);font-weight:600;
+  line-height:1.02;letter-spacing:-.015em;
+}
+.intro h1 span{display:block}
+.intro-copy{margin-top:28px;max-width:372px;font-size:13.5px;line-height:1.92;color:var(--muted);letter-spacing:.01em}
+.intro-note{display:flex;align-items:center;gap:8px;margin-top:26px;font-size:11px;letter-spacing:.045em;color:var(--faint)}
+.intro-note i{width:5px;height:5px;border-radius:50%;background:var(--brass);flex:0 0 auto}
+
+/* ── 今天：左栏的账本 ── */
+.today{grid-area:today;max-width:448px;margin-top:54px;padding-top:17px;border-top:1px solid var(--line);animation:enter .75s .12s cubic-bezier(.2,.7,.3,1) both}
+.today-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding-bottom:2px}
+.today-head h2{font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:.05em}
+.today-head span{font-size:11px;color:var(--faint);letter-spacing:.03em}
+.ledger{display:block}
+.entry{
+  display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;
+  padding:14px 0;border-bottom:1px solid var(--line2);
+}
+.entry:last-child{border-bottom:0;padding-bottom:0}
+.entry-label{font-size:11px;line-height:1.4;color:var(--faint);letter-spacing:.07em;padding-top:4px}
+.entry-body{min-width:0}
+.entry-main{
+  font-family:var(--serif);font-size:23px;font-weight:600;line-height:1.18;
+  color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:.01em;
+}
+.entry-main small{display:block;font-family:var(--sans);font-size:11px;font-weight:400;line-height:1.5;color:var(--muted);letter-spacing:.02em;margin-top:3px}
+.entry-sub{margin-top:4px;font-size:11px;line-height:1.65;color:var(--faint);letter-spacing:.01em}
+.entry-sub b{font-weight:500;color:var(--muted)}
+.entry.linkable{cursor:pointer}
+.entry.linkable:hover .entry-main{color:var(--a,var(--brass))}
+.entry.weather .entry-main{color:var(--ink)}
+.todo-list{display:flex;flex-direction:column;gap:5px;min-height:25px;margin-top:1px}
+.todo-empty{font-size:11px;line-height:1.7;color:var(--faint);padding:2px 0}
+.td{display:flex;align-items:center;gap:7px;font-size:11px;line-height:1.5;color:var(--ink)}
+.td .box{
+  width:12px;height:12px;flex:0 0 auto;border:1px solid rgba(239,233,221,.22);border-radius:1px;
+  display:grid;place-items:center;font-size:11px;color:var(--notes);cursor:pointer;transition:.16s;
+}
+.td .box:hover{border-color:var(--notes);background:rgba(192,183,156,.12)}
+.td .box.on{border-color:rgba(192,183,156,.55);background:rgba(192,183,156,.16)}
+.td .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.td span.done{color:var(--faint);text-decoration:line-through}
+.td .del{margin-left:auto;flex:0 0 auto;padding:1px 4px;border:1px solid transparent;border-radius:2px;background:none;color:#c98374;font:13px/1 var(--sans);opacity:.78;cursor:pointer;transition:color .15s,opacity .15s,border-color .15s,background .15s}
+.td .del:hover,.td .del:focus-visible{opacity:1;color:var(--danger);border-color:rgba(222,66,23,.34);background:rgba(222,66,23,.08);outline:none}
+.td-add{display:flex;align-items:center;gap:5px;margin-top:7px}
+.td-add input{
+  flex:1;min-width:0;font:10.5px var(--sans);color:var(--ink);background:transparent;
+  border:0;border-bottom:1px solid var(--line2);border-radius:0;padding:3px 0 4px;outline:none;
+}
+.td-add input::placeholder{color:var(--faint)}
+.td-add input:focus{border-bottom-color:rgba(192,183,156,.5)}
+.td-add button{font-size:11px;color:var(--muted);padding:3px 5px;border-radius:1px;white-space:nowrap}
+.td-add button:hover{color:var(--ink);background:rgba(255,255,255,.05)}
+.td-add button.clear{color:var(--faint)}
+.td-add button.clear:hover{color:#e89184;background:rgba(232,145,132,.08)}
+.dl-bar{height:1px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:6px;width:82%}
+.dl-bar i{display:block;height:100%;width:0;background:var(--download);transition:width .5s}
+.cal-big{font-variant-numeric:tabular-nums}
+
+/* ── 右栏目录 ── */
+.directory{grid-area:directory;min-width:0;padding-top:18px;animation:enter .8s .08s cubic-bezier(.2,.7,.3,1) both}
+.dir-head{display:flex;align-items:baseline;gap:14px;padding-bottom:15px;border-bottom:1px solid var(--line)}
+.dir-head h2{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:.03em;line-height:1.1;white-space:nowrap}
+.dir-line{flex:1;height:1px;background:var(--line2);transform:translateY(-2px)}
+.dir-meta{font-size:11px;color:var(--faint);letter-spacing:.04em;white-space:nowrap}
+.group{margin-top:28px}
+.group:first-of-type{margin-top:26px}
+.group-head{display:flex;align-items:center;gap:8px;padding-bottom:9px;border-bottom:1px solid var(--line2);margin-bottom:2px}
+.group-dot{width:4px;height:4px;border-radius:50%;background:var(--brass);flex:0 0 auto}
+.group-head h3{margin:0;font-size:12px;font-weight:500;letter-spacing:.06em;color:var(--muted)}
+.group-count{margin-left:auto;font-size:11px;letter-spacing:.04em;color:var(--faint)}
+
+.room-row{
+  --a:var(--brass);--soft:var(--brass-soft);--edge:rgba(196,163,110,.4);
+  position:relative;display:grid;grid-template-columns:minmax(0,1fr) 110px;
+  align-items:center;gap:18px;padding:15px 5px 15px 16px;
+  border-bottom:1px solid var(--line2);cursor:pointer;outline:none;
+  transition:background .2s ease,padding .22s ease;
+}
+.room-row::before{
+  content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;
+  background:var(--a);opacity:.7;transition:opacity .2s,top .2s,bottom .2s;pointer-events:none;
+}
+.room-row:hover,.room-row:focus-visible{
+  background:linear-gradient(90deg,var(--soft),rgba(255,255,255,0) 68%);
+  padding-left:21px;
+}
+.room-row:hover::before,.room-row:focus-visible::before{opacity:1;top:9px;bottom:9px}
+.room-row:focus-visible{outline:1px solid var(--edge);outline-offset:-1px}
+.room-row[data-state="off"]::before{opacity:.26}
+.room-row[data-state="off"] .fig b,.room-row[data-state="off"] .status{color:var(--faint)}
+.room-row[data-state="busy"] .status i{background:var(--book);animation:blink 1s ease-in-out infinite}
+@keyframes blink{50%{opacity:.28}}
+
+.room-main{display:flex;align-items:center;gap:14px;min-width:0}
+.glyph{
+  width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;
+  color:var(--a);background:var(--soft);border:1px solid var(--edge);border-radius:2px;
+  transition:background .2s,border-color .2s,transform .2s;
+}
+.glyph svg{width:18px;height:18px}
+.room-row:hover .glyph,.room-row:focus-visible .glyph{background:rgba(255,255,255,.04);transform:translateX(1px)}
+.room-copy{min-width:0}
+.room-copy h3{
+  font-family:var(--serif);font-size:21px;font-weight:600;line-height:1.2;
+  letter-spacing:.035em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.room-copy .line{
+  margin-top:3px;font-size:11.5px;line-height:1.5;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;
+}
+.chips{display:flex;flex-wrap:wrap;gap:0;margin-top:4px;padding:0}
+.chips span{
+  font-size:11px;line-height:1.5;color:var(--faint);background:none;border:0;padding:0;
+  white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+}
+.chips span+span::before{content:"·";margin:0 7px;color:rgba(239,233,221,.26)}
+
+.fig-wrap{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0}
+.fig{display:flex;align-items:baseline;justify-content:flex-end;gap:4px;min-width:0;color:var(--a)}
+.fig b{
+  font-family:var(--serif);font-size:27px;font-weight:600;line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap;
+}
+.fig span{font-size:11px;color:var(--muted);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px}
+.status{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:11px;font-weight:500;line-height:1.3;color:var(--muted);white-space:nowrap}
+.status i{width:5px;height:5px;border-radius:50%;background:var(--faint);flex:0 0 auto}
+.status em{font-style:normal}
+.room-row[data-state="on"] .status{color:var(--a)}
+.room-row[data-state="on"] .status i{background:var(--a);box-shadow:0 0 0 3px var(--soft)}
+/* ★ 2026-11-22 加「状态未知」态（S4）：熔断期不知道它活没活。
+   视觉上必须与「未启动」不同（灰淡）和「运行中」不同（亮色）：
+   用琥珀色 + 虚线圆点，说明「不确定」而不是「坏了」或「好着」。 */
+.room-row[data-state="unknown"] .status{color:var(--warn)}
+.room-row[data-state="unknown"] .status i{
+  background:transparent;border:1px dashed var(--warn);box-shadow:none;
+}
+.go{display:none}
+
+/* 每间房的颜色只做信号，不做墙 */
+.room-row[data-id="magnet"]{--a:var(--magnet);--soft:rgba(126,166,224,.13);--edge:rgba(126,166,224,.38)}
+.room-row[data-id="book"]{--a:var(--book);--soft:rgba(214,160,94,.13);--edge:rgba(214,160,94,.38)}
+.room-row[data-id="music"]{--a:var(--music);--soft:rgba(221,119,104,.13);--edge:rgba(221,119,104,.38)}
+.room-row[data-id="vod"]{--a:var(--vod);--soft:rgba(169,150,221,.13);--edge:rgba(169,150,221,.38)}
+.room-row[data-id="download"]{--a:var(--download);--soft:rgba(95,173,168,.13);--edge:rgba(95,173,168,.38)}
+.room-row[data-id="library"]{--a:var(--library);--soft:rgba(156,172,105,.13);--edge:rgba(156,172,105,.38)}
+.room-row[data-id="notes"]{--a:var(--notes);--soft:rgba(192,183,156,.13);--edge:rgba(192,183,156,.38)}
+.room-row[data-id="calendar"]{--a:var(--calendar);--soft:rgba(196,137,169,.13);--edge:rgba(196,137,169,.38)}
+.room-row[data-id="photos"]{--a:var(--photos);--soft:rgba(127,180,196,.13);--edge:rgba(127,180,196,.38)}
+.room-row[data-id="cast"]{--a:var(--cast);--soft:rgba(224,164,110,.13);--edge:rgba(224,164,110,.38)}
+
+/* ── 页脚 ── */
+.foot{
+  display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;
+  margin-top:auto;padding-top:20px;border-top:1px solid var(--line);
+  font-size:11px;letter-spacing:.04em;color:var(--faint);
+}
+.foot-left{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.foot-left b{font-weight:500;color:var(--muted);letter-spacing:.08em}
+.foot-right{display:flex;align-items:baseline;gap:18px}
+.foot-right span:first-child{font-variant-numeric:tabular-nums}
+
+/* ── 舞台 ── */
+.stage{
+  position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
+  background:#070a08;opacity:0;visibility:hidden;transform:translateY(10px);pointer-events:none;
+  transition:opacity .24s ease,transform .24s cubic-bezier(.2,.7,.3,1),visibility .24s;
+}
+.stage.on{opacity:1;visibility:visible;transform:none;pointer-events:auto}
+.stage-bar{
+  height:54px;flex:0 0 54px;display:flex;align-items:center;gap:16px;padding:0 18px;
+  background:rgba(11,14,12,.92);border-bottom:1px solid var(--line2);
+  backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);
+}
+.stage-back{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;letter-spacing:.08em;
+  color:var(--muted);padding:6px 4px;border-radius:1px;transition:.18s;
+}
+.stage-back:hover{color:var(--ink)}
+.stage-back svg{width:14px;height:14px}
+.stage-id{display:flex;align-items:center;gap:9px;min-width:0}
+.stage-id b{font-family:var(--serif);font-size:16px;font-weight:600;letter-spacing:.06em;white-space:nowrap}
+.stage-state{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap;letter-spacing:.03em}
+.stage-state i{width:4px;height:4px;border-radius:50%;background:var(--faint)}
+.stage-state.on{color:var(--ok)}
+.stage-state.on i{background:var(--ok)}
+.stage-acts{margin-left:auto;display:flex;align-items:center;gap:6px}
+.stage-acts button{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;letter-spacing:.04em;color:var(--muted);
+  padding:6px 9px;border:1px solid var(--line2);border-radius:1px;transition:.18s;white-space:nowrap;
+}
+.stage-acts button:hover{color:var(--ink);border-color:var(--line);background:rgba(255,255,255,.04)}
+.stage-acts button svg{width:13px;height:13px}
+.stage-acts .stop:hover{color:#e89184;border-color:rgba(232,145,132,.3)}
+.stage-body{position:relative;flex:1;min-height:0;background:#000}
+.frame{
+  position:absolute;inset:0;width:100%;height:100%;border:0;background:#0b0e0c;
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s;
+}
+.frame.on{opacity:1;visibility:visible;pointer-events:auto}
+.veil{
+  position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;
+  background:#070a08;transition:opacity .3s,visibility .3s;
+}
+.veil.off{opacity:0;visibility:hidden}
+.veil .ring{
+  width:20px;height:20px;border-radius:50%;border:1px solid rgba(239,233,221,.14);
+  border-top-color:var(--brass);animation:spin .9s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.veil em{font-style:normal;font-size:11px;letter-spacing:.09em;color:var(--muted)}
+
+/* ── 提示 ── */
+.toast{
+  position:fixed;left:50%;bottom:26px;z-index:300;transform:translate(-50%,10px);
+  background:rgba(14,17,14,.96);border:1px solid var(--line);border-radius:2px;
+  padding:9px 15px;font-size:11px;letter-spacing:.04em;color:var(--ink);
+  box-shadow:0 16px 40px -18px rgba(0,0,0,.8);opacity:0;visibility:hidden;
+  transition:.24s;max-width:82vw;text-align:center;
+}
+.toast.on{opacity:1;visibility:visible;transform:translate(-50%,0)}
+
+/* 骨架 */
+body.loading .room-row .fig b,
+body.loading .entry-main{color:transparent;position:relative}
+body.loading .room-row .fig b::after,
+body.loading .entry-main::after{
+  content:"";position:absolute;left:0;top:50%;width:30px;height:11px;transform:translateY(-50%);
+  border-radius:1px;background:rgba(255,255,255,.07);
+}
+body.loading .entry-main::after{width:48px;height:15px}
+body.loading .status{opacity:.35}
+
+@keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ── 中屏 ── */
+@media (max-width:1120px){
+  .page{padding-left:30px;padding-right:30px}
+  .layout{column-gap:40px;grid-template-columns:minmax(290px,.7fr) minmax(0,1.3fr)}
+  .intro h1{font-size:clamp(44px,4.8vw,62px)}
+  .room-row{grid-template-columns:minmax(0,1fr) 96px;gap:12px}
+}
+@media (max-width:940px){
+  .layout{
+    grid-template-columns:1fr;grid-template-areas:"intro" "directory" "today";grid-template-rows:auto;
+    padding-top:28px;
+  }
+  .intro{max-width:700px}
+  .intro h1{font-size:clamp(48px,7.4vw,68px)}
+  .intro-copy{max-width:480px}
+  .today{max-width:700px;margin-top:48px}
+  .directory{padding-top:0;margin-top:48px}
+  .dir-head h2{font-size:25px}
+  .room-row{grid-template-columns:minmax(0,1fr) 108px}
+  .foot{margin-top:36px}
+}
+
+/* ── 窄屏 ── */
+@media (max-width:700px){
+  .page{padding:20px 18px 22px}
+  .top{flex-wrap:wrap;gap:14px;padding-bottom:15px}
+  .brand{gap:10px}
+  .seal{width:31px;height:31px;font-size:14px}
+  .brand-text b{font-size:14px}
+  .brand-text i{font-size:11px}
+  .top-right{gap:12px;margin-left:auto}
+  .clock{display:none}
+  .net{font-size:11px}
+  .btn-all{padding:6px 9px;font-size:11px}
+  .layout{padding:30px 0 38px;row-gap:0}
+  .intro{padding-top:6px;max-width:none}
+  .intro h1{font-size:clamp(43px,10vw,54px);line-height:1.04}
+  .intro-copy{font-size:13px;line-height:1.85;margin-top:22px;max-width:340px}
+  .intro-note{font-size:11px;margin-top:22px}
+  .directory{margin-top:42px}
+  .dir-head{gap:10px}
+  .dir-head h2{font-size:24px}
+  .dir-meta{font-size:11px}
+  .group{margin-top:24px}
+  .group-head{padding-bottom:8px}
+  .room-row{grid-template-columns:minmax(0,1fr) 92px;gap:10px;padding:13px 2px 13px 12px}
+  .room-row:hover,.room-row:focus-visible{padding-left:15px}
+  .room-row::before{top:12px;bottom:12px}
+  .room-main{gap:10px}
+  .glyph{width:30px;height:30px;flex-basis:30px}
+  .glyph svg{width:16px;height:16px}
+  .room-copy h3{font-size:18px;letter-spacing:.02em}
+  .room-copy .line{font-size:11px;margin-top:1px}
+  .chips{display:none}
+  .fig b{font-size:23px}
+  .fig span{font-size:11px;max-width:56px}
+  .status{font-size:11px}
+  .today{margin-top:40px;padding-top:15px}
+  .today-head h2{font-size:18px}
+  .entry{grid-template-columns:46px minmax(0,1fr);gap:10px;padding:12px 0}
+  .entry-main{font-size:21px}
+  .entry-sub{font-size:11px}
+  .foot{display:block;line-height:1.9;padding-top:18px}
+  .foot-left{display:block}
+  .foot-left b{display:block;margin-bottom:2px}
+  .foot-right{display:flex;justify-content:space-between;margin-top:6px}
+  .stage-bar{height:48px;flex-basis:48px;gap:8px;padding:0 10px}
+  .stage-acts{gap:4px}
+  .stage-acts button{padding:5px 6px;font-size:11px}
+  .stage-acts button em{display:none}
+  .stage-id b{font-size:14px}
+}
+@media (max-width:390px){
+  .intro h1{font-size:42px}
+  .room-row{grid-template-columns:minmax(0,1fr) 88px;gap:8px}
+  .room-copy h3{font-size:17px}
+  .fig b{font-size:21px}
+  .fig span{font-size:11px;max-width:50px}
+}
+@media (prefers-reduced-motion:reduce){
+  .intro,.today,.directory{animation:none!important}
+  .stage,.toast,.frame,.room-row{transition:none!important}
+}
+</style>
+</head>
+<body class="loading">
+<div class="grain" aria-hidden="true"></div>
+
+<div class="page" id="page">
+  <header class="top">
+    <a class="brand" href="/" aria-label="五五客厅首页">
+      <span class="seal">55</span>
+      <span class="brand-text"><b>五五客厅</b><i>wuwu's living room</i></span>
+    </a>
+    <div class="top-right">
+      <div class="net" id="net"><i></i><span id="netText">检查中</span></div>
+      <button class="btn-retry" id="netRetry" type="button" hidden title="重新读取客厅概览">重试</button>
+      <button class="btn-all" id="startAll" type="button">全部启动</button>
+      <div class="clock">
+        <b id="clock">--:--</b>
+        <span id="date">—</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+
+  <!-- ★ 2026-11-22 补页内错误呈现（S1）：原来 summary 失败只把 body 切出骨架态、
+       顶栏写「客厅没连上」，十间房的数字全显示「—」—— 与「这些房间确实是 0」
+       长得一样。现在明确一条：读不到就是读不到，别让用户猜。 -->
+  <div class="empty error" id="homeErr" hidden style="margin-bottom:14px">
+    <b>客厅概览没读出来</b>
+    <span id="homeErrMsg">服务可能没在跑，或者端口被占了。</span>
+    <span class="act"><button class="btn sm ghost" type="button" id="homeErrRetry">重新读取</button></span>
+  </div>
+    <section class="intro">
+      <h1><span>十间房，</span><span>一套服务。</span></h1>
+      <p class="intro-copy">下载、媒体、笔记、追更、相册和投屏，连同读书、听歌、看片、找片，都收在同一个地址。需要哪一间，点开就用。</p>
+      <div class="intro-note"><i aria-hidden="true"></i><span>全部在本机运行，数据不离开这台电脑</span></div>
+    </section>
+
+    <aside class="today" aria-label="今天">
+      <div class="today-head"><h2>今天</h2><span>杭州 · 此刻</span></div>
+      <div class="ledger">
+        <div class="entry weather" id="cellWeather">
+          <div class="entry-label">天气</div>
+          <div class="entry-body">
+            <div class="entry-main" id="wTemp">—</div>
+            <div class="entry-sub" id="wSub">天气读取中</div>
+          </div>
+        </div>
+
+        <div class="entry todo" id="cellTodo">
+          <div class="entry-label">待办</div>
+          <div class="entry-body">
+            <div class="todo-list" id="todoList"><div class="todo-empty">读取中…</div></div>
+            <div class="td-add">
+              <input id="todoInput" placeholder="加一件今天要做的事，回车" autocomplete="off" maxlength="60">
+              <button id="todoAdd" type="button">加上</button>
+              <button id="todoClear" class="clear" type="button" title="删掉所有已完成的待办">清完</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="entry dl linkable cell" id="cellDl" data-room="download" role="link" tabindex="0" aria-label="去下载中心" style="--a:var(--download)">
+          <div class="entry-label">下载</div>
+          <div class="entry-body">
+            <div class="entry-main" id="dlMain">—</div>
+            <div class="dl-bar"><i id="dlBar"></i></div>
+            <div class="entry-sub" id="dlSub">读取中</div>
+          </div>
+        </div>
+
+        <div class="entry read linkable cell" id="cellRead" data-room="book" role="link" tabindex="0" aria-label="去书房" style="--a:var(--book)">
+          <div class="entry-label">在读</div>
+          <div class="entry-body">
+            <div class="entry-main" id="rdMain">—</div>
+            <div class="entry-sub" id="rdSub">读取中</div>
+          </div>
+        </div>
+
+        <div class="entry cal linkable cell" id="cellCal" data-room="calendar" role="link" tabindex="0" aria-label="去追更日历" style="--a:var(--calendar)">
+          <div class="entry-label">追更</div>
+          <div class="entry-body">
+            <div class="entry-main cal-big" id="calMain">—</div>
+            <div class="entry-sub" id="calSub">读取中</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <section class="directory" aria-label="十间房服务目录">
+      <div class="dir-head"><h2>十间房</h2><span class="dir-line" aria-hidden="true"></span><span class="dir-meta">按用途分两组</span></div>
+
+      <div class="group">
+        <div class="group-head"><span class="group-dot" aria-hidden="true"></span><h3>内容</h3><span class="group-count">四间</span></div>
+
+        <div class="room-row door" data-id="magnet" role="button" tabindex="0" aria-label="打开搜磁力">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M7 4v8.2a5 5 0 0 0 10 0V4"/><path d="M7 4h3.2M13.8 4H17"/><path d="M7 8.2h3.2M13.8 8.2H17" opacity=".45"/></svg></span>
+            <div class="room-copy"><h3>搜磁力</h3><p class="line">找一个种子，直接看。</p><div class="chips"><span>边下边播</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>个源</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="book" role="button" tabindex="0" aria-label="打开书房">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 6.4c-1.9-1.3-4.1-1.8-7.2-1.8v12.8c3.1 0 5.3.5 7.2 1.8 1.9-1.3 4.1-1.8 7.2-1.8V4.6c-3.1 0-5.3.5-7.2 1.8z"/><path d="M12 6.4v12.8"/></svg></span>
+            <div class="room-copy"><h3>看书</h3><p class="line">书源、在读、今天读了多少。</p><div class="chips"><span>本地引擎</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>条书源</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="music" role="button" tabindex="0" aria-label="打开听音乐">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4.6 14.4v-2.2a7.4 7.4 0 0 1 14.8 0v2.2"/><path d="M4.6 14.4h2.1v4.4H4.6zM17.3 14.4h2.1v4.4h-2.1z"/></svg></span>
+            <div class="room-copy"><h3>听音乐</h3><p class="line">一张唱片，一副耳机。</p><div class="chips"><span>网易云 / 酷我</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>个音源</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="vod" role="button" tabindex="0" aria-label="打开看视频">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3.4" y="5.4" width="17.2" height="13.2" rx="2.6"/><path d="M10.2 9.4l4.8 2.6-4.8 2.6z" fill="currentColor" stroke="none"/></svg></span>
+            <div class="room-copy"><h3>看视频</h3><p class="line">一部片子，不必等。</p><div class="chips"><span>m3u8 直连</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>个站</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="group-dot" aria-hidden="true"></span><h3>日常</h3><span class="group-count">六间</span></div>
+
+        <div class="room-row door" data-id="download" role="button" tabindex="0" aria-label="打开下载中心">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 3.6v10.2"/><path d="M7.6 9.8L12 14.2 16.4 9.8"/><path d="M4.4 16v3.2a1.2 1.2 0 0 0 1.2 1.2h12.8a1.2 1.2 0 0 0 1.2-1.2V16"/></svg></span>
+            <div class="room-copy"><h3>下载中心</h3><p class="line">磁力、直链，进度看得见。</p><div class="chips"><span>队列</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>个在下载</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="library" role="button" tabindex="0" aria-label="打开媒体库">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3.2" y="4.4" width="17.6" height="15.2" rx="2.4"/><path d="M3.2 15.4l4.6-3.6 3.4 2.8 3.2-2.4 5.4 4.2" opacity=".65"/><circle cx="8.4" cy="8.6" r="1.4"/></svg></span>
+            <div class="room-copy"><h3>媒体库</h3><p class="line">海报墙、简介、看到第几集。</p><div class="chips"><span>豆瓣刮削</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>部在库里</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="notes" role="button" tabindex="0" aria-label="打开笔记库">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.4 3.6h8.4l3.6 3.6v13.2H6.4z"/><path d="M9 10h6.2M9 13.4h6.2M9 16.8h4" opacity=".55"/></svg></span>
+            <div class="room-copy"><h3>笔记库</h3><p class="line">划线、随想，都搜得到。</p><div class="chips"><span>全文检索</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>条笔记</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="calendar" role="button" tabindex="0" aria-label="打开追更日历">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3.6" y="5" width="16.8" height="15" rx="2.2"/><path d="M3.6 9.4h16.8" opacity=".5"/><path d="M8 3.2v3.2M16 3.2v3.2"/><circle cx="8.6" cy="13.4" r="1.1"/><circle cx="14.4" cy="13.4" r="1.1"/></svg></span>
+            <div class="room-copy"><h3>追更日历</h3><p class="line">番剧、剧集、连载，下次几点。</p><div class="chips"><span>订阅 + 倒计时</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>条待更</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="photos" role="button" tabindex="0" aria-label="打开相册">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3.4" y="3.8" width="11.6" height="11.6" rx="1.8"/><rect x="9" y="9" width="11.6" height="11.6" rx="1.8" opacity=".42"/></svg></span>
+            <div class="room-copy"><h3>相册</h3><p class="line">按年月摊开，能投到电视上。</p><div class="chips"><span>时间轴</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>张照片</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+
+        <div class="room-row door" data-id="cast" role="button" tabindex="0" aria-label="打开投屏">
+          <div class="room-main">
+            <span class="glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="6" y="2.4" width="12" height="19.2" rx="2.4"/><path d="M9.6 19h4.8"/><path d="M9 7.4h6" opacity=".42"/></svg></span>
+            <div class="room-copy"><h3>投屏</h3><p class="line">手机画面搬到 Mac，声音留在电脑。</p><div class="chips"><span>scrcpy</span></div></div>
+          </div>
+          <div class="fig-wrap"><div class="fig"><b>—</b><span>台设备</span></div><div class="status"><i></i><em>检查中</em></div></div>
+          <span class="go"><span>打开</span></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-left"><b>一个地址，十间房</b><span>书房只用本地引擎；其余服务由客厅统一转发，数据留在这台电脑。</span></div>
+    <div class="foot-right"><span id="updated">状态读取中</span><span>127.0.0.1:8890</span></div>
+  </footer>
+</div>
+
+<section class="stage" id="stage" aria-hidden="true" inert>
+  <header class="stage-bar">
+    <button class="stage-back" id="back" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>
+      客厅
+    </button>
+    <div class="stage-id">
+      <b id="stageName">—</b>
+      <span class="stage-state" id="stageState"><i></i><em>运行中</em></span>
+    </div>
+    <div class="stage-acts">
+      <button id="actNew" type="button" title="在新窗口打开">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14 4h6v6"/><path d="M20 4l-8.5 8.5"/><path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5"/></svg>
+        <em>新窗口</em>
+      </button>
+      <button id="actReload" type="button" title="重新载入">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+        <em>刷新</em>
+      </button>
+      <button id="actStop" class="stop" type="button" title="停止这个服务">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        <em>停止</em>
+      </button>
+    </div>
+  </header>
+  <div class="stage-body">
+    <div class="veil" id="veil"><span class="ring"></span><em id="veilText">正在连接…</em></div>
+    <iframe class="frame" data-id="magnet" title="搜磁力" allow="fullscreen; autoplay; clipboard-write; encrypted-media"></iframe>
+    <iframe class="frame" data-id="music" title="听音乐" allow="fullscreen; autoplay; clipboard-write; encrypted-media"></iframe>
+    <iframe class="frame" data-id="vod" title="看视频" allow="fullscreen; autoplay; clipboard-write; encrypted-media"></iframe>
+    <iframe class="frame" data-id="book" title="书房" allow="fullscreen; clipboard-write"></iframe>
+  </div>
+</section>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/assets/toast.js"></script>
+<script src="/assets/notify-panel.js" data-ww-history="消息记录"></script>
+  <script src="/assets/fetch-timeout.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* 内嵌在舞台里的四间；后六间是同一进程里的页面，直接跳过去 */
+  var STAGE_IDS = ['magnet', 'book', 'music', 'vod'];
+  var ORDER = ['magnet', 'book', 'music', 'vod', 'download', 'library', 'notes', 'calendar', 'photos', 'cast'];
+  var STATE = { apps: [], summary: null };
+  var ROOM_FALLBACK = {
+    magnet: { id:'magnet', name:'搜磁力', kind:'web', path:'/magnet/' },
+    book: { id:'book', name:'看书', kind:'room', path:'/book/' },
+    music: { id:'music', name:'听音乐', kind:'web', path:'/music/' },
+    vod: { id:'vod', name:'看视频', kind:'web', path:'/vod/' },
+    download: { id:'download', name:'下载', path:'/download/' },
+    library: { id:'library', name:'书库', path:'/library/' },
+    notes: { id:'notes', name:'记事', path:'/notes/' },
+    calendar: { id:'calendar', name:'日历', path:'/calendar/' },
+    photos: { id:'photos', name:'相册', path:'/photos/' },
+    cast: { id:'cast', name:'投屏', path:'/cast/' }
+  };
+  var ACTIVE = null;
+  var starting = {};
+  var stageSeq = 0;
+
+  var $ = function (sel, el) { return (el || document).querySelector(sel); };
+  var $$ = function (sel, el) { return Array.prototype.slice.call((el || document).querySelectorAll(sel)); };
+
+  function fmt(n) {
+    return (typeof n === 'number' && isFinite(n)) ? n.toLocaleString('en-US') : '—';
+  }
+  function bytes(n) {
+    if (!n || !isFinite(n)) return '0 B';
+    var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + ' ' + u[i];
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function appById(id) {
+    for (var i = 0; i < STATE.apps.length; i++) if (STATE.apps[i].id === id) return STATE.apps[i];
+    // 首屏状态还没回来时也要能点开门，不能让页面看起来卡住。
+    return ROOM_FALLBACK[id] || null;
+  }
+  function roomOf(id) {
+    var s = STATE.summary && STATE.summary.rooms;
+    return (s && s[id]) || null;
+  }
+
+  /* ── 时钟 ── */
+  function tick() {
+    var now = new Date();
+    var h = String(now.getHours()).padStart(2, '0');
+    var m = String(now.getMinutes()).padStart(2, '0');
+    var week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()];
+    $('#clock').textContent = h + ':' + m;
+    $('#date').textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日 ' + week;
+  }
+
+  /* ── 概览 ── */
+  function paintConsole() {
+    var s = STATE.summary || {};
+
+    // 天气
+    var w = s.weather || {};
+    if (w.ok) {
+      $('#wTemp').innerHTML = w.temp + '°<small>体感 ' + w.feels + '° · ' + esc(w.text) + '</small>';
+      var today = (w.days && w.days[0]) || {};
+      $('#wSub').innerHTML = '最高 <b>' + today.high + '°</b> / 最低 <b>' + today.low + '°</b>' +
+        (today.rain != null ? ' · 降水 ' + today.rain + '%' : '') +
+        (w.sunset ? ' · ' + (w.sunset.split('T')[1] || '').slice(0, 5) + ' 日落' : '');
+    } else {
+      $('#wTemp').innerHTML = '—';
+      $('#wSub').textContent = w.message || '天气没取到';
+    }
+
+    // 待办
+    var todos = (s.todos && s.todos.todo) || [];
+    var list = $('#todoList');
+    if (!todos.length) {
+      list.innerHTML = '<div class="todo-empty">今天还没安排。写一件，回车加上。</div>';
+    } else {
+      // ★ 2026-11-22 修：原来只渲染前 5 条，超出的直接消失且不提示，
+      //   用户会以为「今天只有 5 件事」。超出时补一行如实说明还剩多少。
+      var TODO_PAGE = 5;
+      var todoAll = paintTodos._all === true;
+      var todoShown = todoAll ? todos : todos.slice(0, TODO_PAGE);
+      var todoHtml = todoShown.map(function (t) {
+        return '<div class="td" data-id="' + t.id + '">' +
+          '<span class="box' + (t.done ? ' on' : '') + '" data-toggle="' + t.id + '" role="checkbox" aria-checked="' + (t.done ? 'true' : 'false') + '">' + (t.done ? '✓' : '') + '</span>' +
+          '<span class="txt' + (t.done ? ' done' : '') + '" title="' + esc(t.text) + '">' + esc(t.text) + '</span>' +
+          '<button class="del" type="button" data-del="' + t.id + '" title="删除这条待办" aria-label="删除待办">×</button>' +
+          '</div>';
+      }).join('');
+      if (todos.length > TODO_PAGE) {
+        // ★ 2026-11-22：不只提示，还要能展开 —— 否则用户只能知道"还有"，看不到内容。
+        todoHtml += '<div class="todo-more" data-todo-more="1" style="opacity:.75;font-size:12px;padding:4px 2px;cursor:pointer;text-decoration:underline">' +
+          (todoAll
+            ? '收起（只看前 ' + TODO_PAGE + ' 条）'
+            : '还有 ' + (todos.length - TODO_PAGE) + ' 条未显示（共 ' + todos.length + ' 条）· 展开全部') +
+          '</div>';
+      }
+      list.innerHTML = todoHtml;
+      var moreBtn = list.querySelector('[data-todo-more]');
+      if (moreBtn) {
+        moreBtn.onclick = function () { paintTodos._all = !paintTodos._all; paintTodos(); };
+      }
+    }
+
+    // 下载：活跃数、首个活跃任务进度条、总速度、任务总数
+    var dl = s.downloads || {};
+    var active = dl.active || 0;
+    var activeTask = null;
+    (dl.tasks || []).forEach(function (t) { if (!activeTask && t.state === 'active') activeTask = t; });
+    if (!activeTask && dl.tasks && dl.tasks[0]) activeTask = dl.tasks[0];
+    $('#dlMain').innerHTML = dl.ready
+      ? (active ? active + '<small>个在下载</small>' : '<span style="font-family:var(--sans);font-size:15px;letter-spacing:.06em">空闲</span>')
+      : '<span style="font-family:var(--sans);font-size:14px;color:var(--faint)">未装好</span>';
+    if (dl.ready) {
+      var parts = [];
+      if (activeTask) parts.push(esc(activeTask.name).slice(0, 16) + ' · <b>' + Math.round(activeTask.progress || 0) + '%</b>');
+      parts.push('总速 <b>' + bytes(dl.speed) + '/s</b>');
+      parts.push('共 ' + (dl.total || 0) + ' 个任务');
+      $('#dlSub').innerHTML = parts.join(' · ');
+    } else {
+      $('#dlSub').textContent = dl.message || '下载中心还没装好';
+    }
+    $('#dlBar').style.width = (activeTask ? Math.min(100, activeTask.progress || 0) : 0) + '%';
+
+    // 在读
+    var rd = s.reading || {};
+    $('#rdMain').innerHTML = rd.lastBook
+      ? '《' + esc(String(rd.lastBook).slice(0, 8)) + '》'
+      : '<span style="font-family:var(--sans);font-size:15px;letter-spacing:.06em">' + (rd.ok ? '还没翻开' : '书房没开') + '</span>';
+    $('#rdSub').innerHTML = rd.ok
+      ? '今天 <b>' + (rd.todayMinutes || 0) + ' 分钟</b> · ' + fmt(rd.sources) + ' 条书源'
+      : '本地引擎 · 书房照常能读';
+
+    // 追更
+    var calRoom = s.rooms && s.rooms.calendar;
+    var nx = calRoom && calRoom.ready === false ? null : s.nextUpdate;
+    if (nx) {
+      $('#calMain').innerHTML = nx.inText ? esc(nx.inText) : (nx.inDays != null ? nx.inDays + '<small>天后</small>' : '—');
+      $('#calSub').innerHTML = esc(nx.title || '') + (nx.source ? ' · <b>' + esc(nx.source) + '</b>' : '');
+    } else {
+      $('#calMain').innerHTML = '—';
+      $('#calSub').textContent = (s.rooms && s.rooms.calendar && s.rooms.calendar.ready) ? '还没有要追的条目' : '追更日历还没装好';
+    }
+  }
+
+  /* 待办交互 */
+  function todoPost(payload) {
+    return wwFetch('/api/home/todos', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.ok) throw new Error(d.message || '没存上');
+      if (STATE.summary) STATE.summary.todos = { todo: d.today, all: d.todos.length };
+      paintConsole();
+    }).catch(function (e) { toast(wwDescribeError(e), true); });
+  }
+
+  function addTodo() {
+    var el = $('#todoInput');
+    var v = el.value.trim();
+    if (!v) return;
+    el.value = '';
+    todoPost({ action: 'add', text: v });
+  }
+
+  /* ── 状态 ── */
+  function refresh() {
+    return wwFetch('/api/home/summary', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('summary ' + r.status); return r.json(); })
+      .then(function (data) {
+        STATE.summary = data;
+        STATE.apps = data.apps || [];
+        paint();
+        document.body.classList.remove('loading');
+        var he = document.getElementById('homeErr');
+        if (he) he.hidden = true;
+      })
+      .catch(function () {
+        // ★ 2026-11-22 修「失败被显示成加载中」：
+        //   原来只有成功分支 remove('loading')，失败时 body 一直带着 .loading，
+        //   而 .loading 会把门名/数字变 transparent 再盖灰条（见 <style> 320-329 行），
+        //   用户看到的是「页面还在转圈」，实际已经失败，且没有任何重试入口。
+        //   现在：失败必须退出骨架态（门的静态值是「—」，不会骗人）并给出重试。
+        document.body.classList.remove('loading');
+        document.body.classList.add('load-failed');
+        $('#netText').textContent = '客厅没连上';
+        $('#net').classList.add('off');
+        var retry = document.getElementById('netRetry');
+        if (retry) retry.hidden = false;
+        var he = document.getElementById('homeErr');
+        if (he) he.hidden = false;
+      });
+  }
+
+  function doorData(id) {
+    var room = roomOf(id);
+
+    if (id === 'magnet') {
+      var a = appById('magnet') || {};
+      var st = a.stats || {};
+      return {
+        fig: fmt(st.total), unit: '个源',
+        chips: [st.enabled != null ? st.enabled + ' 个启用' : '多源聚合', '边下边播'],
+        cta: '进入', state: a.running ? 'on' : (a.degraded ? 'unknown' : 'off'), degraded: !!a.degraded, retryInMs: a.retryInMs || 0
+      };
+    }
+    if (id === 'book') {
+      var ab = appById('book') || {};
+      var sb = ab.stats || {};
+      // ★ 2026-11-22 修「假空」：SWR 首次返回 {pending:true, sources:null}，
+      //   原来 fmt(null) → '—'，tail 又落到 '书架还空着'，
+      //   于是「一个书源都没有 + 书架是空的」同时出现，用户读到的是「书房是空的」，
+      //   而实际 1–2 秒后就会变成 7,538。这是把「还在取」伪装成「确实没有」。
+      //   现在三态分开，与 public/书房.html 的写法一致：
+      //     pending → 获取中…   stale → 刷新中…（给旧值）   都不是 → 真实值（0 就是 0）
+      var pending = ab.pending === true;
+      var stale = ab.stale === true;
+      var blank = pending ? '获取中…' : (stale ? '刷新中…' : null);
+      var sourcesText = (typeof sb.sources === 'number' && isFinite(sb.sources))
+        ? sb.sources.toLocaleString('en-US')
+        : (blank || '0');
+      var tail;
+      if (sb.lastBook) tail = '在读《' + sb.lastBook + '》';
+      else if (sb.todayMinutes) tail = '今天 ' + sb.todayMinutes + ' 分钟';
+      else tail = blank || '书架还空着';
+      // ★ 2026-11-22 补 stale 的信号：SWR 命中旧值时 fig 给的是旧数字，
+      //   但 tail 会照常写「在读《…》」或「书架还空着」，用户看不出这个数是旧的。
+      //   三态里 pending 已经会说「获取中…」，stale 却什么都不说 —— 等于把
+      //   「1–2 秒前的数」冒充「现在的数」。这里在 chip 上明确标出「刷新中…」。
+      if (stale && !pending) tail = '刷新中… · ' + tail;
+      return {
+        fig: sourcesText, unit: '条书源',
+        chips: ['本地书源', tail],
+        cta: '进入',
+        // 书房是客厅自带的页面，用本地引擎，不存在「未启动」
+        state: 'on'
+      };
+    }
+    if (id === 'music') {
+      var am = appById('music') || {};
+      var sm = am.stats || {};
+      return {
+        fig: fmt(sm.sources), unit: '个音源',
+        chips: ['网易云 / 酷我', am.running ? '双源在线' : '未启动'],
+        cta: '进入', state: am.running ? 'on' : (am.degraded ? 'unknown' : 'off'), degraded: !!am.degraded, retryInMs: am.retryInMs || 0
+      };
+    }
+    if (id === 'vod') {
+      var av = appById('vod') || {};
+      var sv = av.stats || {};
+      return {
+        fig: fmt(sv.total), unit: '个站',
+        chips: [sv.active != null ? sv.active + ' 站活跃' : '采集站', 'm3u8 直连'],
+        cta: '进入', state: av.running ? 'on' : (av.degraded ? 'unknown' : 'off'), degraded: !!av.degraded, retryInMs: av.retryInMs || 0
+      };
+    }
+
+    if (!room || !room.ready) {
+      return {
+        fig: '—', unit: '',
+        chips: [(room && room.message) ? String(room.message).slice(0, 28) : '还没装好'],
+        cta: '未装好', state: 'off'
+      };
+    }
+
+    if (id === 'download') {
+      var act = (room.active || 0);
+      return {
+        fig: fmt(act), unit: '个在下载',
+        chips: [act ? (bytes(room.speed) + '/s') : '队列空闲', '共 ' + (room.total || 0) + ' 个任务'],
+        cta: '进入', state: 'on'
+      };
+    }
+    if (id === 'library') {
+      return {
+        fig: fmt(room.total), unit: '部在库里',
+        chips: ['刮削 ' + (room.scraped || 0) + ' 部', room.series ? (room.series + ' 部剧') : '本地影片'],
+        cta: '进入', state: 'on'
+      };
+    }
+    if (id === 'notes') {
+      var latest = room.latest && room.latest[0];
+      return {
+        fig: fmt(room.total), unit: '条笔记',
+        chips: ['今天 +' + (room.today || 0), latest ? String(latest.title).slice(0, 12) : '全文可搜'],
+        cta: '进入', state: 'on'
+      };
+    }
+    if (id === 'calendar') {
+      var nx = room.next;
+      return {
+        fig: fmt(room.today || 0), unit: '条待更',
+        chips: [nx ? ('下次 ' + (nx.inText || ('还有 ' + nx.inDays + ' 天'))).slice(0, 20) : '还没有追更条目',
+          '未读 ' + (room.unread || 0)],
+        cta: '进入', state: 'on'
+      };
+    }
+    if (id === 'photos') {
+      return {
+        fig: fmt(room.total), unit: '张照片',
+        chips: [(room.months || 0) + ' 个月份', '缩略图 ' + (room.thumbs || 0)],
+        cta: '进入', state: 'on'
+      };
+    }
+    if (id === 'cast') {
+      var live = !!room.running;
+      var n = room.connected || 0;
+      return {
+        fig: n ? fmt(n) : '0', unit: '台设备',
+        chips: [live ? ('投屏中 · ' + String(room.preset || '默认')) : (n ? '可以开始' : '插 USB 就绪'),
+          'scrcpy 5.0.1'],
+        cta: '进入', state: 'on'
+      };
+    }
+    return { fig: '—', unit: '', chips: [], cta: '进入', state: 'on' };
+  }
+
+  function setChips(el, items) {
+    el.innerHTML = '';
+    (items || []).forEach(function (t) {
+      var s = document.createElement('span');
+      s.textContent = t;
+      el.appendChild(s);
+    });
+  }
+
+  function paint() {
+    var online = 0, total = 0;
+
+    var unknown = 0;
+    ORDER.forEach(function (id) {
+      var d = doorData(id);
+      var door = $('.door[data-id="' + id + '"]');
+      if (!door) return;
+
+      total++;
+      if (d.state === 'on') online++;
+      else if (d.state === 'unknown') unknown++;
+
+      door.dataset.state = d.state;
+      // ★ 2026-11-22 消费 degraded（S4 第①条，契约里性价比最高的一行）：
+      //   熔断期后端返回 {running:false, degraded:true}，旧代码一律显示「未启动」——
+      //   把「我不知道」说成「它死了」是撒谎，用户会去点启动，而它可能活着。
+      //   现在显示「状态未知」+ 约 N 秒后自动重试。
+      var label;
+      if (d.state === 'on') {
+        label = STAGE_IDS.indexOf(id) >= 0 ? '运行中' : '就绪';
+      } else if (d.state === 'unknown') {
+        var sec = d.retryInMs ? Math.max(1, Math.round(d.retryInMs / 1000)) : 0;
+        label = sec ? ('状态未知 · ' + sec + ' 秒后重试') : '状态未知';
+      } else {
+        label = d.cta === '未装好' ? '未装好' : '未启动';
+      }
+      if (id === 'book' && d.state === 'on') label = '书房就绪';
+      $('.status em', door).textContent = label;
+
+      $('.fig b', door).textContent = d.fig;
+      $('.fig span', door).textContent = d.unit;
+      setChips($('.chips', door), d.chips);
+      $('.go span', door).textContent = d.cta;
+    });
+
+    $('#netText').textContent = online + ' / ' + total + ' 间在线' + (unknown ? ' · ' + unknown + ' 间状态未知' : '');
+    $('#net').classList.toggle('off', online === 0);
+    $('#updated').textContent = '状态更新 ' + new Date().toTimeString().slice(0, 8);
+
+    paintConsole();
+  }
+
+  /* ── 进入某一间 ── */
+  function roomReady(id) {
+    var r = roomOf(id);
+    if (r) return !!r.ready;
+    var a = appById(id);
+    if (!a) return false;
+    return a.ready != null ? !!a.ready : !!a.running;
+  }
+
+  function runningOf(id, a) {
+    if (id === 'book') return !!a.webRunning;
+    return !!a.running;
+  }
+
+  function enter(id) {
+    if (STAGE_IDS.indexOf(id) >= 0) {
+      var a = appById(id);
+      if (!a) return;
+      // 先同步把舞台开出来，不等启动；没在跑的在后台补启动，绝不一上来吞掉第一下
+      openStage(id);
+      if (id !== 'book' && !runningOf(id, a)) {
+        startApp(id, true).then(syncActiveStage).catch(function () {});
+      }
+      return;
+    }
+
+    // 非舞台房：点一下直接跳；未就绪由落地页自己兜底，不再弹 toast 拦住
+    if (enter._nav === id) return;
+    enter._nav = id;
+    window.location.href = '/' + id + '/';
+  }
+
+  function openStage(id) {
+    var a = appById(id);
+    var frame = $('.frame[data-id="' + id + '"]');
+    if (!a || !frame) return;
+    var mySeq = ++stageSeq;
+
+    // ★ 2026-11-18：房间若把自己导航出了自己的前缀（iframe 里装进了客厅首页），
+    //   下次进这间会直接看到"两个客厅"。先看当前路径，落回根就强制重载本间。
+    if (frame.dataset.loaded) {
+      var nowPath = null;
+      try { nowPath = frame.contentWindow.location.pathname; } catch (e) {}
+      if (nowPath === '/') frame.dataset.loaded = '';
+    }
+    var hadFrame = !!frame.dataset.loaded;   // 已载入过的房间不会再发 load 事件，别一直盖着遮罩
+    if (!frame.dataset.loaded) {
+      frame.src = (a.path || ('/' + id + '/'));
+      frame.dataset.loaded = '1';
+    }
+    // 同一时刻只亮一个 frame；连点以最后一次为准
+    $$('.frame').forEach(function (f) { f.classList.toggle('on', f === frame); });
+
+    var isBook = id === 'book';              // 书房是页面房，阅读引擎可选：没引擎也「就绪」，不是「正在启动」
+    var running = runningOf(id, a);
+    $('#stageName').textContent = a.name;
+    $('#stageState').className = 'stage-state' + (running ? ' on' : '');
+    $('#stageState em').textContent = running ? '运行中' : (isBook ? '就绪' : '正在启动');
+
+    var veil = $('#veil'), veilText = $('#veilText');
+    veil.classList.remove('off');
+    veilText.textContent = running ? ('正在连接 ' + a.name + '…')
+      : (isBook ? ('正在打开 ' + a.name + '…') : ('正在启动 ' + a.name + '…'));
+
+    $('#stage').classList.add('on');
+    $('#stage').removeAttribute('inert');
+    $('#stage').setAttribute('aria-hidden', 'false');
+    document.body.classList.add('in-stage');
+    ACTIVE = id;
+
+    clearTimeout(openStage._t);
+    if (hadFrame) {
+      // 页面已经在 iframe 里，这次只是切回来：没有 load 事件，遮罩尽快退场
+      openStage._t = setTimeout(function () { veil.classList.add('off'); }, 350);
+    } else if (running) {
+      openStage._t = setTimeout(function () { veil.classList.add('off'); }, 900);
+    } else {
+      // 没在跑：veil 留到启动完成 / iframe 载入；兜底 6s 后先撤掉，别黑在原地
+      openStage._t = setTimeout(function () { veil.classList.add('off'); }, 6000);
+    }
+    frame.onload = function () {
+      if (mySeq !== stageSeq || ACTIVE !== id) return;
+      var p = null;
+      try { p = frame.contentWindow.location.pathname; } catch (e) {}
+      // ★ 2026-11-18：房间把首页写死成 '/'，在客厅前缀下会跳成客厅根地址，
+      //   舞台 iframe 里就套进第二层客厅、冒出两个返回。这里发现即拉回本间。
+      if (p === '/') {
+        if (frame.dataset.recovered === String(mySeq)) {
+          closeStage();
+          toast('「' + a.name + '」的返回地址不对，已退出舞台', true);
+          return;
+        }
+        frame.dataset.recovered = String(mySeq);
+        frame.src = (a.path || ('/' + id + '/'));
+        toast('已回到「' + a.name + '」');
+        return;
+      }
+      veil.classList.add('off');
+    };
+  }
+
+  /* 后台启动完成后，回写当前舞台的状态（连点换房时不回写旧舞台） */
+  function syncActiveStage() {
+    if (!ACTIVE) return;
+    var id = ACTIVE;
+    var a = appById(id);
+    if (!a) return;
+    var running = runningOf(id, a);
+    $('#stageState').className = 'stage-state' + (running ? ' on' : '');
+    $('#stageState em').textContent = running ? '运行中' : '正在启动';
+    if (running) $('#veil').classList.add('off');
+  }
+
+  function closeStage() {
+    $('#stage').classList.remove('on');
+    $('#stage').setAttribute('inert', '');
+    $('#stage').setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('in-stage');
+    ACTIVE = null;
+  }
+
+  function post(path, body) {
+    return wwFetch(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body || {})
+    }).then(function (r) { return r.json(); });
+  }
+
+  function startApp(id, quiet) {
+    if (starting[id]) return starting[id];
+    var door = $('.door[data-id="' + id + '"]');
+    if (door) door.dataset.state = 'busy';
+    if (!quiet) toast('正在启动…');
+    var p = post('/api/start', { id: id })
+      .then(function (d) {
+        if (d && d.ok === false && d.message) toast(d.message);
+        return new Promise(function (res) { setTimeout(res, 1200); });
+      })
+      .then(refresh)
+      .catch(function () { toast('启动请求失败了', true); })
+      .then(function () { delete starting[id]; });
+    starting[id] = p;
+    return p;
+  }
+
+  function stopApp(id) {
+    return post('/api/stop', { id: id })
+      .then(function (d) { if (d && d.ok === false && d.message) toast(d.message); return refresh(); })
+      .catch(function () { toast('停止请求失败了', true); });
+  }
+
+  /* ── 事件 ── */
+  // 失败态重试：点一下回到真正加载态（恢复骨架），再走 refresh；
+  // 不用 setTimeout 假装成功，refresh 自己成功才 remove('loading')。
+  var netRetryEl = document.getElementById('netRetry');
+  if (netRetryEl) netRetryEl.onclick = function () {
+    netRetryEl.hidden = true;
+    document.body.classList.remove('load-failed');
+    document.body.classList.add('loading');
+    $('#net').classList.remove('off');
+    $('#netText').textContent = '检查中';
+    refresh();
+  };
+
+  // 错误条上的重试：与顶栏那个走同一条路（先回加载态，成功才撤），
+  // 不给「点了没反应」留缝。
+  var homeErrRetryEl = document.getElementById('homeErrRetry');
+  if (homeErrRetryEl) homeErrRetryEl.onclick = function () {
+    var he = document.getElementById('homeErr');
+    if (he) he.hidden = true;
+    document.body.classList.remove('load-failed');
+    document.body.classList.add('loading');
+    $('#net').classList.remove('off');
+    $('#netText').textContent = '检查中';
+    refresh();
+  };
+
+  $('#startAll').onclick = function () {
+    post('/api/start-all').then(function () { toast('正在启动各屋服务…（书房不用启动）'); setTimeout(refresh, 1400); });
+  };
+
+  $$('.door').forEach(function (door) {
+    var id = door.getAttribute('data-id');
+    door.addEventListener('click', function () { enter(id); });
+    door.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.repeat) return; // 长按不重复触发
+      e.preventDefault();
+      enter(id);
+    });
+  });
+
+  /* 概览里下载 / 在读 / 追更三格整格可点 */
+  $$('.cell.linkable').forEach(function (cell) {
+    var rid = cell.getAttribute('data-room');
+    cell.addEventListener('click', function () { enter(rid); });
+    cell.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (e.repeat) return;
+      e.preventDefault();
+      enter(rid);
+    });
+  });
+
+  $('#back').onclick = closeStage;
+  $('#actReload').onclick = function () {
+    if (!ACTIVE) return;
+    var f = $('.frame[data-id="' + ACTIVE + '"]');
+    if (f) { f.dataset.loaded = ''; f.src = f.src; }
+  };
+  $('#actNew').onclick = function () {
+    if (!ACTIVE) return;
+    var a = appById(ACTIVE);
+    if (a) window.open(a.path || ('/' + ACTIVE + '/'), '_blank');
+  };
+  $('#actStop').onclick = function () {
+    if (!ACTIVE) return;
+    stopApp(ACTIVE).then(function () { closeStage(); });
+  };
+
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin) return;
+    if (e.data && e.data.type === 'wuwu:close') closeStage();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || '')) return;
+    if (ACTIVE) { if (e.key === 'Escape') closeStage(); return; }
+    var n = Number(e.key);
+    if (n === 0) {
+      enter('cast');   // 0 → 投屏（1-9 已经被九间房占满）
+    } else if (n >= 1 && n <= 9) {
+      var id = ORDER[n - 1];
+      if (id) enter(id);
+    }
+  });
+
+  // 待办
+  $('#todoAdd').onclick = addTodo;
+  $('#todoClear').onclick = function () { todoPost({ action: 'clear-done' }); };
+  $('#todoInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); addTodo(); }
+  });
+  $('#todoList').addEventListener('click', function (e) {
+    var del = e.target.closest ? e.target.closest('[data-del]') : null;
+    if (del) {
+      e.preventDefault();
+      e.stopPropagation();
+      todoPost({ action: 'delete', id: del.getAttribute('data-del') });
+      return;
+    }
+    var el = e.target.closest ? e.target.closest('[data-toggle]') : null;
+    if (!el) {
+      var row = e.target.closest ? e.target.closest('.td') : null;
+      if (!row) return;
+      el = row.querySelector('[data-toggle]');
+    }
+    if (el) todoPost({ action: 'toggle', id: el.getAttribute('data-toggle') });
+  });
+
+  tick();
+  setInterval(tick, 30000);
+  refresh();
+  setInterval(refresh, 8000);
+})();
+</script>
+</body>
+</html>

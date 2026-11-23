@@ -83,8 +83,17 @@ async function runSearch(kw) {
       firstAt = Date.now() - t0;
       firstInfo = { name: items[0].name, url: items[0].bookSourceUrl || items[0].url, bookUrl: items[0].bookUrl };
     }
-    if (!snapped && (j.done || j.status === 'done')) snapped = j;
-    if (j.done || j.status === 'done' || j.status === 'error') {
+    // 只在任务真正收尾时取快照。
+    // 旧写法 `j.done` 是个「已结算源数」计数器，一开始有进度就为真，
+    // 于是 snapped 抓到的是流式中途的快照：那时条目按「谁先返回」追加，
+    // 17K 这类秒回但打不开的源全挤在最前面，后面 10 本全按它去开必然失败。
+    // 实测这个假象会让人误判「打开链路 100% 失败」。
+    if (!snapped && j.status !== 'running') snapped = j;
+    // 只能用 status 判收尾。`j.done` 是「已结算源数」，搜索一开始有进度就 > 0，
+    // 旧写法会让 runSearch 在 4 秒时就把中途快照当成完整结果返回——
+    // 那时列表前面全是 17K 秒回条目，于是 10 本全按打不开的源去 open，
+    // 报出「打开链路 100% 失败」的假象（实测修正后能拿到完整 320 条）。
+    if (j.status !== 'running') {
       return {
         kw, job,
         firstItemMs: firstAt,

@@ -25,6 +25,7 @@ import { createHash } from 'node:crypto';
 import { execFile, spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { searchAllSources, getSourceStats, ensureSourceCache, groupBooks, groupKeyOf, getSourceByUrl, awaitSourceCache } from './lib/book_source_search.mjs';
+import { appendLog as _appendLog, logPath as _logPath } from './lib/log_dir.mjs';
 import { searchdHealth, healthCacheSnapshot, searchViaSearchd, searchdBase } from './lib/book_searchd.mjs';
 import { raceOpenViaSearchd, chapterContentViaSearchd } from './lib/book_open_searchd.mjs';
 import { bookInfo as engineBookInfo, chapterList as engineChapterList, chapterContent as engineChapterContent, warmup as engineWarmup } from './lib/legado/index.mjs';
@@ -33,17 +34,49 @@ import { rankSources, remainingBudget, recordOutcome, shouldSwitchFor } from './
 import { raceOpen } from './lib/book_race.mjs';
 import { warmOnSearchHits } from './lib/book_warm.mjs';
 import { loadRooms, roomRoutes, roomSummaries, roomsReady, ROOM_LIST } from './lib/rooms.mjs';
+import { readJson, readRaw as readRawBytes, BodyError } from './lib/http_body.mjs';
+import { writeJsonSync } from './lib/json_store.mjs';
+import { acquireInstanceLock, installInstanceLockCleanup } from './lib/instance_lock.mjs';
 import { homeSummary, homeTodos } from './lib/home.mjs';
 import { readShelf, addToShelf, removeFromShelf, touchShelfProgress } from './lib/book_shelf.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
+// 同一 runtime/ 只允许一个可写实例。旧实现只靠 per-path Promise 链 + 原子 rename，
+// 进程内安全，但第二个进程启动后各自持有独立 cache，read-modify-write 会互相覆盖
+// （实测 2 进程各 100 次只剩约 100 条）。实验实例必须另给 WUWU_RUNTIME_DIR。
+const RUNTIME_DIR = process.env.WUWU_RUNTIME_DIR
+  ? path.resolve(process.env.WUWU_RUNTIME_DIR)
+  : path.join(ROOT, 'runtime');
+const INSTANCE_LOCK = path.join(RUNTIME_DIR, '.instance.lock');
+if (process.env.WUWU_ALLOW_MULTI_INSTANCE !== '1') {
+  try {
+    acquireInstanceLock(INSTANCE_LOCK, { label: '五五客厅' });
+    installInstanceLockCleanup(INSTANCE_LOCK);
+  } catch (e) {
+    console.error(`[boot] ${e.message || e}`);
+    process.exit(78); // EX_CONFIG：配置/部署错误，不是服务内部异常
+  }
+}
+
 // 进程级兜底：规则引擎个别源在请求构造/定时器里可能抛异常，记录后留在进程内，绝不让单源异常打挂主线程。
+// ★ 2026-11-22 修正（隔离端口实测的僵尸态）：原实现吞掉所有 uncaught，
+// 连 listen EADDRINUSE 也被吞 —— 实测 PORT=19080 被占时进程 state=S 继续存活、
+// 端口由别人响应、日志只留一行 uncaught，launchd 的 KeepAlive=1 因进程还在
+// 而不会重启，于是"state=running 但服务不可用"。
+// 现在只吞非致命异常（规则引擎个别源偶发抛错），端口类致命错误必须非 0 退出。
+const FATAL_EXIT_CODES = new Set(['EADDRINUSE', 'EACCES', 'EADDRNOTAVAIL']);
 process.on('uncaughtException', (err) => {
-  try { fs.appendFileSync('/tmp/wuwu-book-search.log', `[${new Date().toISOString()}] uncaught: ${err && err.message ? err.message : err}\n`); } catch { /* ignore */ }
+  // 崩溃兜底必须写在持久目录：/tmp 会被系统清理，证据会在被查到之前消失（2026-11-22）
+  try { _appendLog('book-search.log', `[${new Date().toISOString()}] uncaught: ${err && err.message ? err.message : err}\n`); } catch { /* ignore */ }
+  if (err && FATAL_EXIT_CODES.has(err.code)) {
+    try { _appendLog('book-search.log', `[${new Date().toISOString()}] fatal: ${err.code} → exit(1) 让 launchd 重启\n`); } catch { /* ignore */ }
+    console.error(`[fatal] ${err.code}：端口类致命错误，以 exit=1 退出以便 launchd 重启`);
+    process.exit(1);
+  }
 });
 process.on('unhandledRejection', (err) => {
-  try { fs.appendFileSync('/tmp/wuwu-book-search.log', `[${new Date().toISOString()}] unhandled rejection: ${err && err.message ? err.message : err}\n`); } catch { /* ignore */ }
+  try { _appendLog('book-search.log', `[${new Date().toISOString()}] unhandled rejection: ${err && err.message ? err.message : err}\n`); } catch { /* ignore */ }
 });
 
 const bootStartedAt = Date.now();
@@ -51,13 +84,51 @@ const PORT = Number(process.env.PORT || 8890);
 const LAN = process.argv.includes('--lan');
 const BIND = process.env.BIND || (LAN ? '0.0.0.0' : '127.0.0.1');
 
-const CONFIG_FILE = path.join(ROOT, 'config', 'apps.json');
+/* ★ 2026-11-22 加环境变量覆盖点（WW_APPS_CONFIG）。
+ *   起因：上一轮修 stopApp 的「已停止」假承诺时，**无法用隔离实例验证返回体** ——
+ *   CONFIG_FILE 写死到 config/apps.json，隔离实例只能指向真配置，
+ *   于是要验证「stop 成功分支」就必须真停一个生产服务（当时停的是 magnet）。
+ *   这与本文件其他地方的做法不一致：ENDPOINTS_FILE 早已支持 WW_VOD_ENDPOINTS 覆盖，
+ *   PORT / BIND / WUWU_RUNTIME_DIR 也都能覆盖，只有 apps 配置不能。
+ *   加这个覆盖点后，stopApp / startApp 这类「会改服务状态」的逻辑可以在隔离树里验完再上线。 */
+const CONFIG_FILE = process.env.WW_APPS_CONFIG || path.join(ROOT, 'config', 'apps.json');
 const PAGE_FILE = path.join(ROOT, 'public', '五五客厅.html');
 const BOOK_FILE = path.join(ROOT, 'public', '书房.html');
 // 静态页启动期读入内存，请求处理路径上不再做同步文件读。
+// ★ 2026-11-22：这两页是「启动快照」——改了磁盘不重启就不生效。
+//   今天因此误判过多次（有人改完首页以为立刻生效、有人拿 mtime 判生效）。
+//   现在把「快照时刻」记下来，经 /api/ping 暴露，让「改了≠生效」变成可读信号。
 const PAGE_HTML = fs.readFileSync(PAGE_FILE, 'utf8');
 const BOOK_HTML = fs.readFileSync(BOOK_FILE, 'utf8');
-const ACTION_LOG = '/tmp/wuwu-living-actions.log';
+const SNAPSHOT_AT = Date.now();
+/* ★ 2026-11-22 加内容哈希：只比 mtime 会把「touch 一下没改内容」误报成 stale。
+ *   实测：首页与书房被 touch 后 mtime 变了、内容一字未改，/api/ping 却报 stale=true，
+ *   导致有人据此以为「改动没生效」去重启（白重启一次）。
+ *   现在同时记 hash，判 stale 的条件是 **hash 不同**；mtime 只作辅助信息。 */
+const _sha12 = (buf) => {
+  try { return createHash('sha256').update(buf).digest('hex').slice(0, 12); } catch { return null; }
+};
+/* ★ 2026-11-22：快照页清单显式化。
+ *   原来这两页写死在循环字面量里，将来若第三页改成快照（启动期读入内存），
+ *   很容易忘了加进来 —— 那样 /api/ping 会永远说「快照页与磁盘一致」，
+ *   而那一页实际上改了不重启不生效。这是「判据覆盖不全 = 假绿」的典型形态。
+ *   现在清单独立成常量，并暴露到 /api/ping 的 snapshotPages 字段，
+ *   配一条自检：snapshotPages.length 必须等于这里登记的数量。 */
+const SNAPSHOT_PAGES = [
+  { name: '五五客厅.html', file: PAGE_FILE },
+  { name: '书房.html', file: BOOK_FILE },
+];
+const SNAPSHOT_INFO = (() => {
+  const out = {};
+  for (const { name, file } of SNAPSHOT_PAGES) {
+    try {
+      const buf = fs.readFileSync(file);
+      out[name] = { mtimeMs: fs.statSync(file).mtimeMs, hash: _sha12(buf) };
+    } catch { /* 读不到就不记 */ }
+  }
+  return out;
+})();
+const ACTION_LOG = _logPath('actions.log');
 
 const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
 const apps = cfg.apps || {};
@@ -75,7 +146,12 @@ const busy = new Map();
 const extraCache = new Map();
 const staticPageCache = new Map();
 const STATIC_PAGE_TTL = 5000;
-const bookCache = { t: 0, data: null, pending: null };
+// 书房状态缓存。ttl 从原来的 12s（Reader 未跑时）/45s 统一提到 300s：
+// 旧值 12 秒等于没缓存——用户每 12 秒就撞一次 2.5–3.2 秒的 python 查询。
+// 书籍/书源数据不是秒级变化的，5 分钟足够；过期也只在后台补，请求路径不再等。
+const BOOK_TTL_OK = 300 * 1000;    // 查到了：书籍数据不是秒级变化，5 分钟足够
+const BOOK_TTL_FAIL = 15 * 1000;   // 查失败：只冻 15 秒就重试，绝不把「失败」当「新鲜」缓存 5 分钟
+const bookCache = { t: 0, data: null, pending: null, ttl: BOOK_TTL_OK, failed: false, lastError: null };
 const searchJobs = new Map();
 let searchJobSeq = 0;
 
@@ -107,37 +183,14 @@ function sendHtml(res, html, code = 200) {
   res.end(buf);
 }
 
+// 请求体读取统一走 lib/http_body.mjs：按 Buffer 拼（不切坏跨块汉字）、
+// 超限抛 413、非法 JSON 抛 400，都由顶层 catch 映射成真正的错误码。
 function readBody(req) {
-  return new Promise((resolve) => {
-    let buf = '';
-    req.on('data', (c) => {
-      buf += c;
-      if (buf.length > 64 * 1024) req.destroy();
-    });
-    req.on('end', () => {
-      if (!buf) return resolve({});
-      try { resolve(JSON.parse(buf)); } catch { resolve({}); }
-    });
-    req.on('error', () => resolve({}));
-  });
+  return readJson(req, { limit: 64 * 1024 });
 }
 
 function readRaw(req, limit = 8 * 1024 * 1024) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    req.on('data', (c) => {
-      size += c.length;
-      if (size > limit) {
-        reject(new Error('请求体过大'));
-        req.destroy();
-      } else {
-        chunks.push(c);
-      }
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
-  });
+  return readRawBytes(req, { limit });
 }
 
 function logLine(msg) {
@@ -178,18 +231,127 @@ async function getJson(url, ms = 3000) {
   }
 }
 
-function probe(base, healthPath = '/', ms = 1800) {
+/**
+ * 探活：带熔断，避免「上游 accept 了却不回包」把首页一起拖死。
+ *
+ * 实测背景：8811（音乐房）会出现「端口在听、进程 STAT=S、%CPU=1.7、accept 后不回包」的挂起态，
+ * 直打根路径 8s 超时 3/3 全超。客厅若每次都等满超时，首页每条请求白付这笔钱。
+ *
+ * 三条纪律：
+ *   1. 超时默认 800ms（不是 1800/5000）——上游健康时响应是 1–20ms，800ms 足够宽容；
+ *   2. 连续 2 次失败即开熔断，60s 内直接返回 degraded，不再发请求；
+ *   3. 熔断期一律如实带 `degraded:true`，界面能据此说「状态未知」而不是假装「已停止」。
+ */
+const probeBreaker = new Map(); // base -> { fails, openUntil, lastMs, lastCode }
+const PROBE_BREAKER_FAILS = 2;
+const PROBE_BREAKER_MS = 60 * 1000;
+const PROBE_OK_TTL = 8 * 1000; // 成功探测结果缓存 8s（music 首打 707ms，不该每请求都付）
+
+function probeBreakerState(base) {
+  const b = probeBreaker.get(base);
+  if (b && b.openUntil && Date.now() < b.openUntil) return b;
+  return null;
+}
+
+/**
+ * 真正发一次探测请求（会等）。
+ * 只有两个地方可以调它：① 熔断关闭时的前台探测（用户主动看状态）；
+ * ② 熔断到期后的**后台**半开探测（绝不在请求路径上等）。
+ */
+function probeFetch(base, healthPath, ms) {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), ms);
   const t0 = process.hrtime.bigint();
   return fetch(base + healthPath, { signal: ac.signal, cache: 'no-store' })
-    .then((r) => ({
-      running: r.status < 500,
-      status: r.status,
-      ms: Math.round(Number(process.hrtime.bigint() - t0) / 1e6),
-    }))
-    .catch(() => ({ running: false, status: 0, ms: null }))
+    .then((r) => {
+      const prev = probeBreaker.get(base) || { fails: 0 };
+      // 5xx 也算失败：能回包但服务不可用，同样不该反复探测
+      if (r.status >= 500) {
+        probeBreaker.set(base, Object.assign({}, prev, { fails: (prev.fails || 0) + 1, openUntil: 0, lastCode: r.status }));
+      } else {
+        // 一次成功即清零，但**保留记录本身**：直接 delete 会把 inflight/halfOpenPending 一起抹掉，
+        // 导致并发请求各自新发一次探测（实测 3 个并发各等 666–792ms，正是这个 bug）。
+        probeBreaker.set(base, Object.assign({}, prev, { fails: 0, openUntil: 0, lastCode: r.status }));
+      }
+      return {
+        running: r.status < 500,
+        status: r.status,
+        ms: Math.round(Number(process.hrtime.bigint() - t0) / 1e6),
+        degraded: false,
+      };
+    })
+    .catch(() => {
+      const prev = probeBreaker.get(base) || { fails: 0 };
+      const fails = (prev.fails || 0) + 1;
+      const openUntil = fails >= PROBE_BREAKER_FAILS ? Date.now() + PROBE_BREAKER_MS : 0;
+      probeBreaker.set(base, Object.assign({}, prev, { fails, openUntil, lastCode: 0 }));
+      return { running: false, status: 0, ms: null, degraded: fails >= PROBE_BREAKER_FAILS, breakerOpen: openUntil > 0 };
+    })
     .finally(() => clearTimeout(timer));
+}
+
+/**
+ * 探活（请求路径用）。**保证不会为同一个上游等待两次**：
+ *   · 熔断开着 → 立刻返回 degraded；
+ *   · 熔断刚好到期 → 立刻返回 degraded，同时**后台**半开探测（这次不付 800ms）；
+ *   · 有在途探测 → 复用它的 Promise，不重复发请求；
+ *   · 否则前台探一次（只有「从没失败过」的正常状态会走这里，代价 ~10ms）。
+ */
+function probe(base, healthPath = '/', ms = 800) {
+  const open = probeBreakerState(base);
+  if (open) {
+    const left = Math.max(0, open.openUntil - Date.now());
+    // 还没到期且没在途探测：直接短路
+    if (left > 0) {
+      return Promise.resolve({
+        running: false, status: 0, ms: null,
+        degraded: true, breakerOpen: true, retryInMs: left,
+      });
+    }
+  }
+  // 到了半开时刻：先给结论，后台去探。这样周期性的 800ms 不会打到任何请求上。
+  const state = probeBreaker.get(base);
+  if (state && state.openUntil) {
+    if (!state.halfOpenPending) {
+      state.halfOpenPending = probeFetch(base, healthPath, ms).finally(() => {
+        const cur = probeBreaker.get(base);
+        if (cur) cur.halfOpenPending = null;
+      });
+    }
+    return Promise.resolve({
+      running: false, status: 0, ms: null,
+      degraded: true, breakerOpen: true, retryInMs: 0,
+    });
+  }
+  // 正常状态：若已有同上游在途探测，复用它（并发只发一次请求）
+  const cur0 = probeBreaker.get(base) || { fails: 0, openUntil: 0 };
+  if (cur0.inflight) return cur0.inflight;
+  // 成功结果也缓存：music 首打实测 707ms（它 accept 后要等半秒才回包），
+  // 而进程重启后每个首页请求都付一次这笔钱。8s 内的成功结果直接复用。
+  if (cur0.okAt && Date.now() - cur0.okAt < PROBE_OK_TTL && cur0.okResult) {
+    return Promise.resolve(Object.assign({}, cur0.okResult, { cached: true }));
+  }
+  // 自己那一层 promise 才是 inflight：外面包一层 finally 清引用，
+  // 但返回给调用方的是同一个 promise，所以并发方拿到的是它、不会新发请求。
+  const task = probeFetch(base, healthPath, ms).then((r) => {
+    if (r && r.running) {
+      const cur = probeBreaker.get(base);
+      if (cur) { cur.okAt = Date.now(); cur.okResult = r; }
+    }
+    return r;
+  }).finally(() => {
+    const cur = probeBreaker.get(base);
+    if (cur && cur.inflight === task) cur.inflight = null;
+  });
+  cur0.inflight = task;
+  probeBreaker.set(base, cur0);
+  return task;
+}
+
+/** 用户手动「启动/停止」后立刻允许重新探测，别让 60s 熔断挡住操作 */
+function resetProbeBreaker(base) {
+  if (base) probeBreaker.delete(base);
+  else probeBreaker.clear();
 }
 
 function cachedExtra(id, ttl, fn) {
@@ -262,81 +424,223 @@ function readerQuery(db, mode = 'info', arg = '') {
   });
 }
 
-function processRunning(name) {
-  return new Promise((resolve) => {
+// pgrep 结果缓存：每次 fork 一个进程实测 0.24s（20 次采样 p50=131ms、max=358ms），
+// 而进程存在与否是秒级事实。60s 内复用结果，避免首页每条请求都白付一次 fork。
+const procRunCache = new Map(); // name -> { at, value, pending }
+const PROC_RUN_TTL = 60 * 1000;
+
+function processRunning(name, ttl = PROC_RUN_TTL) {
+  const hit = procRunCache.get(name);
+  if (hit && hit.value != null && Date.now() - hit.at < ttl) return Promise.resolve(hit.value);
+  if (hit && hit.pending) return hit.pending;
+  const task = new Promise((resolve) => {
     execFile('/usr/bin/pgrep', ['-xq', name], (err) => resolve(!err));
+  }).then((value) => {
+    procRunCache.set(name, { at: Date.now(), value, pending: null });
+    return value;
   });
+  procRunCache.set(name, { at: hit ? hit.at : 0, value: hit ? hit.value : null, pending: task });
+  return task;
 }
 
-async function bookInfo() {
-  if (bookCache.data && Date.now() - bookCache.t < (bookCache.ttl || 45000)) return bookCache.data;
-  // 并发请求共用同一次 Python 查询，避免状态接口和书房页同时拉两个进程
+/** 状态变更后主动让进程探测失效（启动/停止项目时用），避免缓存拖住用户操作 */
+function invalidateProcessRunning(name) {
+  if (name) procRunCache.delete(name);
+  else procRunCache.clear();
+}
+
+/**
+ * 取一次书房状态（贵路径）。只在「后台刷新」里被调用，绝不在请求路径上同步等。
+ *
+ * 实测成本（20+ 次采样）：
+ *   reader_query.py 查 28MB sqlite：1.9–2.9s（其中 groups 全表 json 解析占 0.5–1.1s）
+ *   pgrep -xq Reader：p50=131ms / max=358ms
+ *   curl 1122（无监听）：ECONNREFUSED 1–80ms（不是等满 1500ms 超时）
+ */
+async function bookInfoFetch() {
+  const app = apps.book || {};
+  const bundle = app.bundle || 'Reader';
+  const db = app.db || '';
+  const installed = fs.existsSync(`/Applications/${bundle}.app`);
+  const appRunning = installed ? await processRunning(bundle) : false;
+  const webRunning = installed ? await readerHealth() : false;
+
+  let sources = null;
+  let lastBook = '';
+  let todaySeconds = 0;
+  let groupTotal = 0;
+  let searchable = null;
+  let searchRules = null;
+
+  let dbOk = true;
+  if (installed && db && fs.existsSync(db)) {
+    const q = await readerQuery(db, 'info');
+    if (q) {
+      if (q.sources != null) sources = Number(q.sources) || 0;
+      lastBook = q.lastBook || '';
+      todaySeconds = Number(q.todaySeconds) || 0;
+      groupTotal = Number(q.groupTotal) || 0;
+    } else {
+      // ★ 2026-11-22：readerQuery 失败时 resolve(null)，旧代码会把 sources=null 当正常结果
+      //   写进缓存并标成「新鲜」，于是 /api/status 的 book 段给出 pending=false + sources=null
+      //   ——前端读成「0 条书源」，而直跑 reader_query.py 明明返回 7538。这是第三种假空：
+      //   不是「还在取」，是「取失败了却装作取到了」。
+      //   这里显式标记失败，让上层写短 TTL 并带 stale，不污染 300s 缓存。
+      dbOk = false;
+      logLine('bookInfoFetch: readerQuery 返回 null（python 查询失败或被超时中断）');
+    }
+  }
+
+  try {
+    const cacheStats = getSourceStats();
+    searchable = cacheStats.direct;
+    searchRules = cacheStats.total;
+  } catch (e) {
+    logLine('source cache stats error: ' + (e.message || e));
+  }
+
+  return {
+    installed,
+    running: webRunning,
+    webRunning,
+    appRunning,
+    dbOk,
+    sources,
+    lastBook,
+    todaySeconds,
+    todayMinutes: Math.round(todaySeconds / 60),
+    /* ★ 2026-11-22 删 groups 字段：reader_query.py 自 11-22 起 info 分支恒返回 groups=[]，
+     *   分组明细改走 /api/book/groups 按需拉（lib/reader_query.py:101-110 已写死该契约）。
+     *   留着它会在同一个响应里出现「groups=[] + groupTotal=460」这种自相矛盾
+     *   （运维管家 check_semantic 那类判据会报，且老客户端读它得到空）。
+     *   全站唯一消费者是 书房.html:1866，用 Array.isArray 守卫，删字段行为不变。 */
+    groupTotal,
+    searchable,
+    searchRules,
+    engine: 'Reader 书源引擎',
+    apiBase: READER_BASE,
+    untrusted: !dbOk,   // ★ 2026-11-22：与 stale 分开——这个字段才表示「数据不可信」
+  };
+}
+
+/**
+ * 后台刷新书房状态：并发只跑一份，失败保留旧值（不把界面打空）。
+ * 结构照抄 lib/home.mjs 的 weatherForSummary()：旧值先用、后台补新、如实标 stale。
+ */
+function kickBookRefresh() {
   if (bookCache.pending) return bookCache.pending;
+  const task = bookInfoFetch()
+    .then((data) => {
+      // ★ 2026-11-22：dbOk=false（python 查询失败）时用短 TTL。
+      //   旧行为把 sources=null 当正常结果缓存 300 秒，/api/status 给出
+      //   pending=false + sources=null，前端渲染成「0 条书源」——而直跑
+      //   reader_query.py 明明返回 7538。这是第三种假空：「取失败了却装作取到了」。
+      const okData = data && data.dbOk !== false;
+      bookCache.t = Date.now();
+      bookCache.ttl = okData ? BOOK_TTL_OK : BOOK_TTL_FAIL;
+      bookCache.data = data;
+      bookCache.failed = !okData;
+      return data;
+    })
+    .catch((e) => {
+      bookCache.failed = true;
+      bookCache.lastError = e && (e.message || String(e));
+      logLine('bookInfo 后台刷新失败: ' + bookCache.lastError);
+      return bookCache.data || null;
+    })
+    .finally(() => {
+      if (bookCache.pending === task) bookCache.pending = null;
+    });
+  bookCache.pending = task;
+  return task;
+}
 
-  const task = (async () => {
-    const app = apps.book || {};
-    const bundle = app.bundle || 'Reader';
-    const db = app.db || '';
-    const installed = fs.existsSync(`/Applications/${bundle}.app`);
-    const appRunning = installed ? await processRunning(bundle) : false;
-    const webRunning = installed ? await readerHealth() : false;
-    const cacheTtl = webRunning ? 45000 : 12000;
-
-    let sources = null;
-    let lastBook = '';
-    let todaySeconds = 0;
-    let groups = [];
-    let groupTotal = 0;
-    let searchable = null;
-    let searchRules = null;
-
-    if (installed && db && fs.existsSync(db)) {
-      const q = await readerQuery(db, 'info');
-      if (q) {
-        if (q.sources != null) sources = Number(q.sources) || 0;
-        lastBook = q.lastBook || '';
-        todaySeconds = Number(q.todaySeconds) || 0;
-        groups = Array.isArray(q.groups) ? q.groups : [];
-        groupTotal = Number(q.groupTotal) || groups.length;
-      }
+/**
+ * 书房状态：**永不阻塞请求路径**。
+ * 有值立刻给（过期就带 stale 并在后台补），没值立刻给 pending 占位并在后台去取。
+ */
+async function bookInfo() {
+  const ttl = bookCache.ttl || 300000;
+  if (bookCache.data) {
+    // bookCache.t = 0 是「标记过期」而不是「时间戳」：直接算 Date.now()-0 会得出
+    // 1795338328630ms（epoch 差值）这种假 age。这里把 0 视作「已过期、未知年龄」。
+    const age = bookCache.t > 0 ? Date.now() - bookCache.t : null;
+    const expired = age === null || age >= ttl;
+    /* ★ 2026-11-22 拆开「旧」与「不可信」两个语义（运维管家指出 V2 会在 TTL 边界误报）。
+     *
+     *   旧行为把两者挤进 stale 一个字段：expired || untrusted → stale:true。
+     *   后果：TTL 刚过期那一瞬（数据还在、dbOk=true、sources=7538）也会 stale=true，
+     *   而这是**完全正常**的 SWR 形态 —— 判据 V2「stale=true 且数据齐全且 dbOk=true」
+     *   必然在这个边界误报成缺陷。实测：age=301s / ttl=300s → stale=true + dbOk=true + sources=7538。
+     *
+     *   而两个前端消费方都把 stale 读成「刷新中…」（书房.html:910、五五客厅.html:897），
+     *   即 stale 的既定语义是「给的是旧值、但旧值可信」，它本来就不该表示失败。
+     *
+     *   拆分后语义互斥且各自单一：
+     *     stale     = 数据旧了，正在后台刷（旧值仍可信）
+     *     untrusted = 数据来自一次失败的查询，本身不可信（sources 会是 null）
+     *   两者可同时为 true（旧且不可信），但不再互相冒充。 */
+    const untrusted = !!(bookCache.data && bookCache.data.dbOk === false);
+    if (expired || untrusted) {
+      void kickBookRefresh();
+      return Object.assign({}, bookCache.data, { stale: expired, untrusted, ageMs: age });
     }
-
-    try {
-      const cacheStats = getSourceStats();
-      searchable = cacheStats.direct;
-      searchRules = cacheStats.total;
-    } catch (e) {
-      logLine('source cache stats error: ' + (e.message || e));
-    }
-
-    const data = {
-      installed,
-      running: webRunning,
-      webRunning,
-      appRunning,
-      sources,
-      lastBook,
-      todaySeconds,
-      todayMinutes: Math.round(todaySeconds / 60),
-      groups,
-      groupTotal,
-      searchable,
-      searchRules,
+    return Object.assign({}, bookCache.data, { stale: false, untrusted: false, ageMs: age });
+  }
+  void kickBookRefresh();
+  if (bookCache.failed) {
+    // 明确失败过：如实说没取到，别一直挂着「正在获取」
+    return {
+      installed: fs.existsSync(`/Applications/${apps.book?.bundle || 'Reader'}.app`),
+      running: false,
+      webRunning: false,
+      appRunning: false,
+      /* ★ 2026-11-22 补 dbOk：兜底返回表示「没取到」，必须显式 dbOk:false。
+       *   缺字段的后果（运维管家 check_semantic_book 抓到）：
+       *     · :530 `dbOk !== false` → undefined !== false → 判成健康 → 用 300s 长 TTL
+       *     · :563 `dbOk === false` → undefined === false 为假 → 判成可信 → 不标 stale
+       *   即「未知」被当成「健康」。契约要求：正常返回有 dbOk，兜底也必须有一致的键。 */
+      dbOk: false,
+      untrusted: true,   // ★ 2026-11-22：数据来自失败查询，不可信（与 stale 语义分开）
+      sources: null,
+      lastBook: '',
+      todaySeconds: 0,
+      todayMinutes: 0,
+      /* ★ 2026-11-22 改 null（原为 0）：groupTotal 和 sources 是同一类「还没取到」。
+       *   前端 num() 只在 v != null 时显示数字，null 会走 BLANK → 「获取中…」。
+       *   写 0 会让书房显示「0 组」，而真实值是 460 —— 与 sources 那条假空同源。
+       *   实测：前端管家读 pending 态时看到 groupTotal: 0，以为是「后端没给分组数」。 */
+      groupTotal: null,
+      searchable: null,
+      searchRules: null,
       engine: 'Reader 书源引擎',
       apiBase: READER_BASE,
+      ok: false,
+      pending: false,
+      stale: true,
+      message: '书房状态没取到：' + (bookCache.lastError || '未知原因'),
     };
-    bookCache.t = Date.now();
-    bookCache.ttl = cacheTtl;
-    bookCache.data = data;
-    return data;
-  })();
-
-  bookCache.pending = task;
-  try {
-    return await task;
-  } finally {
-    if (bookCache.pending === task) bookCache.pending = null;
   }
+  return {
+    installed: fs.existsSync(`/Applications/${apps.book?.bundle || 'Reader'}.app`),
+    running: false,
+    webRunning: false,
+    appRunning: false,
+    dbOk: false,   // ★ 2026-11-22：pending 同样是「还没取到」，不是「库是好的」
+    untrusted: true,   // 还没取到 = 不可信，与 stale 分开表达
+    sources: null,
+    lastBook: '',
+    todaySeconds: 0,
+    todayMinutes: 0,
+    groupTotal: null,   // ★ 2026-11-22 改 null：与 sources 一致，别把「没取到」说成「0 组」
+    searchable: null,
+    searchRules: null,
+    engine: 'Reader 书源引擎',
+    apiBase: READER_BASE,
+    pending: true,
+    stale: true,
+    message: '书房状态正在获取',
+  };
 }
 
 async function bookSearch(q) {
@@ -353,12 +657,47 @@ async function bookGroup(name) {
   return r && Array.isArray(r.items) ? r.items : [];
 }
 
+/**
+ * 书源分组明细。从 bookInfo 里拆出来的：只有书房「浏览书源」弹层用得到，
+ * 却让每次 info 都付 0.5–1.1 秒的全表 json 解析。按需拉 + 60s 缓存。
+ */
+const bookGroupsCache = { t: 0, data: null, pending: null };
+const BOOK_GROUPS_TTL = 60 * 1000;
+
+function bookGroups() {
+  const hit = bookGroupsCache.data && Date.now() - bookGroupsCache.t < BOOK_GROUPS_TTL;
+  if (hit) return Promise.resolve(bookGroupsCache.data);
+  if (bookGroupsCache.pending) return bookGroupsCache.pending;
+  const app = apps.book || {};
+  const empty = { groups: [], error: '书房数据库不可用' };
+  const task = (async () => {
+    if (!app.db || !fs.existsSync(app.db)) return empty;
+    const r = await readerQuery(app.db, 'groups');
+    const groups = r && Array.isArray(r.groups) ? r.groups : [];
+    const out = { groups, total: groups.length };
+    bookGroupsCache.t = Date.now();
+    bookGroupsCache.data = out;
+    return out;
+  })()
+    .catch((e) => {
+      logLine('bookGroups error: ' + (e.message || e));
+      return bookGroupsCache.data || empty;
+    })
+    .finally(() => {
+      if (bookGroupsCache.pending === task) bookGroupsCache.pending = null;
+    });
+  bookGroupsCache.pending = task;
+  return task;
+}
+
 /* ───────────────────── 书房：搜索 + Reader 内容引擎 ───────────────────── */
 
 const READER_BASE = (apps.book && apps.book.base) || 'http://127.0.0.1:1122';
 const BOOK_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
-let readerEnsurePromise = null;
+/* ★ 2026-11-20：五五客厅不启动 Reader.app。
+   书房永远用本地多源引擎；只有在 Reader 已经自己运行时，才把它的 Web 引擎当兜底。
+   这里不保留任何 `open -a Reader` 的路径。 */
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -384,7 +723,7 @@ async function fetchText(url, opts = {}, ms = 15000) {
 
 const FANQIE_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const FANQIE_TTL_MS = 10 * 60 * 1000;
-const FANQIE_CACHE_FILE = path.join(ROOT, 'runtime', 'fanqie_recommend.json');
+const FANQIE_CACHE_FILE = path.join(RUNTIME_DIR, 'fanqie_recommend.json');
 const fanqieCache = { t: 0, items: [], updatedAt: 0 };
 let fanqiePending = null;
 
@@ -457,8 +796,9 @@ async function fanqieRecommend(force = false) {
       fanqieCache.items = items;
       fanqieCache.updatedAt = Date.now();
       try {
-        fs.mkdirSync(path.dirname(FANQIE_CACHE_FILE), { recursive: true });
-        fs.writeFileSync(FANQIE_CACHE_FILE, JSON.stringify({ updatedAt: fanqieCache.updatedAt, items }, null, 2));
+        // 直写目标文件时被杀 → 半截 JSON → 下次解析失败，推荐位空一整个 TTL。
+        // 走 json_store 的临时名 + rename，中断也保得住旧缓存。
+        writeJsonSync(FANQIE_CACHE_FILE, { updatedAt: fanqieCache.updatedAt, items });
       } catch { /* 缓存落盘失败不影响展示 */ }
       return { items, updatedAt: fanqieCache.updatedAt, stale: false };
     }
@@ -474,7 +814,7 @@ async function fanqieRecommend(force = false) {
 
 /* ───────────── 书籍详情/目录磁盘缓存 + 打开链路健康 ───────────── */
 
-const BOOKS_DIR = path.join(ROOT, 'runtime', 'books');
+const BOOKS_DIR = path.join(RUNTIME_DIR, 'books');
 const BOOK_CACHE_TTL = 7 * 24 * 3600 * 1000;
 
 /* 打开链路的超时分级、健康落账与失败降权统一由 lib/book_sched.mjs 承担；
@@ -502,7 +842,9 @@ function writeBookCache(origin, bookUrl, payload) {
   try {
     fs.mkdirSync(BOOKS_DIR, { recursive: true });
     const file = path.join(BOOKS_DIR, `${bookCacheKey(origin, bookUrl)}.json`);
-    const tmp = `${file}.tmp`;
+    // 临时名带 pid + 随机后缀：多个实例同时打开同一本书时，
+    // 固定 `.tmp` 会撞在一起，后写的 rename 可能把别人写了一半的文件搬上去。
+    const tmp = `${file}.tmp.${process.pid}.${Math.random().toString(16).slice(2, 8)}`;
     fs.writeFileSync(tmp, JSON.stringify({ at: Date.now(), ...payload }));
     fs.renameSync(tmp, file);
   } catch { /* 落盘失败不阻断打开 */ }
@@ -633,43 +975,6 @@ function readerData(d, label) {
   return d.data;
 }
 
-async function ensureReaderWeb(waitMs = 24000) {
-  if (await readerHealth()) return true;
-  if (readerEnsurePromise) return readerEnsurePromise;
-
-  const app = apps.book || {};
-  const installed = fs.existsSync(`/Applications/${app.bundle || 'Reader'}.app`);
-  if (!installed) return false;
-
-  readerEnsurePromise = (async () => {
-    logLine('starting Reader web engine');
-    try {
-      execFile('/usr/bin/open', ['-a', app.bundle || 'Reader'], (err) => {
-        if (err) logLine('open Reader failed: ' + err.message);
-      });
-    } catch (e) {
-      logLine('open Reader error: ' + e.message);
-    }
-    const t0 = Date.now();
-    while (Date.now() - t0 < waitMs) {
-      await sleep(700);
-      if (await readerHealth()) {
-        bookCache.t = 0;
-        logLine('Reader web engine is ready');
-        return true;
-      }
-    }
-    logLine('Reader web engine timeout');
-    return false;
-  })();
-
-  try {
-    return await readerEnsurePromise;
-  } finally {
-    readerEnsurePromise = null;
-  }
-}
-
 /**
  * 顶点小说搜索页解析。
  * 搜索结果是一张很规整的 HTML 表：tr#nr，6 个 td（书名链接 / 最新章节 / 作者 / 字数 / 更新 / 状态）。
@@ -756,25 +1061,51 @@ function pruneSearchJobs() {
  */
 // 引擎健康探测要 1.4 秒左右，启动时先预热，别让第一次搜索为它白等。
 void searchdHealth(true).catch(() => {});
+// 书源缓存也预热：书房页要显示「可直连/有搜索规则」的条数，第一次打开不能是 0。
+void ensureSourceCache();
 
 function searchBooksWithBestEngine(query, handlers) {
   const localOptions = {
     concurrency: 150,
     timeout: 4500,
     limit: 320,
+    // 整体时限：本地引擎兜底也不能无限跑，超时按「跳过」结算，任务必须能收尾。
+    // 实测 12 槽跑满 3370 源需要约 450–500s，取 720s（12 分钟）留出余量，
+    // 走 searchd（Rust 引擎，60–90s）时完全用不到。
+    totalTimeout: 720000,
     onItems: handlers.onItems,
     onProgress: handlers.onProgress,
   };
   // 不再用 /health 当门禁：引擎忙着搜书时 /health 会慢，判成离线就把整轮打回旧引擎，
   // 用户看到的就是「还是慢、还是不准」。直接连引擎，连不上再回落。
+  //
+  // 2026-11-23 修「假零结果」：
+  //   旧写法一次失败就回落本地引擎，而本地源缓存 runtime/book-sources-full.json
+  //   当时不存在 ⇒ 本地 0 源 ⇒ 任务 61ms 收尾、报「0 本 / 0 源」，
+  //   与「搜过了，没有这本书」在 UI 上完全同形。实际 09:59:59 日志是
+  //   `searchd 搜索失败，回落本地引擎: fetch failed`。
+  //   现在：①瞬时失败先重试一次；②本地源仍为 0 就抛错让任务进 error，
+  //   不再把「引擎不可用」伪装成「没有结果」；③兜底预算从 720s 收到 120s，
+  //   避免用户已经离开书房、进程还在替没人要的结果跑 12 分钟。
+  const FALLBACK_BUDGET_MS = 120000;
+  const isAbort = (error) => !!error && (error.name === 'AbortError' || error.code === 'ABORT_ERR');
+  const attemptSearchd = () => searchViaSearchd(query, {
+    onItems: handlers.onItems,
+    onProgress: handlers.onProgress,
+    timeoutMs: 150000,
+    // 上游被取消时整轮立即收手：旧实现会继续把 3370 个源跑完，
+    // 用户早就离开书房了，进程还在替一个没人要的结果耗 CPU 和带宽。
+    signal: handlers.signal,
+  });
   return Promise.resolve().then(() => {
     const health = healthCacheSnapshot();
     logLine(`book search engine: ${health.ok ? 'reader-searchd' : 'reader-searchd(try)'}${health.info ? ' (' + health.info.sources + ' 源)' : ''}`);
-    return searchViaSearchd(query, {
-      onItems: handlers.onItems,
-      onProgress: handlers.onProgress,
-      timeoutMs: 150000,
-    })
+    return attemptSearchd()
+      .catch((error) => {
+        if (isAbort(error)) throw error;
+        logLine('searchd 搜索失败，1.5s 后重试一次: ' + (error && error.message ? error.message : error));
+        return new Promise((resolve) => setTimeout(resolve, 1500)).then(attemptSearchd);
+      })
       .then((result) => {
         // searchd 返回的是「每源原始命中」，这里补一次与本地引擎同口径的聚合，
         // 保证任务收尾时 result.items 也是分组结构（含每本书的 sources 列表）。
@@ -787,8 +1118,11 @@ function searchBooksWithBestEngine(query, handlers) {
         // 按匹配度优先：搜「高武严父，永远比儿子高五个境界」时，
         // 只共享「高武」两字的泛匹配不能排在真书前面。
         try {
-          // 先按匹配度，再按命中源数：同名书里「三体·刘慈欣」有 100+ 个源，应该排在只有 3 个源的仿作前面。
-          grouped.sort((a, b) => (Number(b.matchScore) || 0) - (Number(a.matchScore) || 0)
+          // 排序三层：能不能真打开 → 匹配度 → 命中源数。
+          // searchOnly 源（17K 接口）秒回结果但目录恒空，让它们霸占列表头部，
+          // 用户点前几本必然报「只提供搜索」，所以可开组必须整体前置。
+          grouped.sort((a, b) => (a.searchOnly ? 1 : 0) - (b.searchOnly ? 1 : 0)
+            || (Number(b.matchScore) || 0) - (Number(a.matchScore) || 0)
             || (Number(b.sourceCount) || 0) - (Number(a.sourceCount) || 0));
         } catch { /* ignore */ }
         return {
@@ -809,8 +1143,27 @@ function searchBooksWithBestEngine(query, handlers) {
         };
       })
       .catch((error) => {
-        logLine('searchd 搜索失败，回落本地引擎: ' + (error && error.message ? error.message : error));
-        return searchAllSources(query, localOptions);
+        if (isAbort(error)) throw error;
+        logLine('searchd 连续两次失败: ' + (error && error.message ? error.message : error));
+        const local = getSourceStats();
+        if (!local || !local.total) {
+          const unusable = new Error('搜书引擎暂时不可用（本地兜底源也没加载到），请稍后重试');
+          unusable.code = 'SEARCH_ENGINE_UNAVAILABLE';
+          throw unusable;
+        }
+        logLine(`本地兜底：${local.total} 源（可搜 ${local.direct}），预算 ${FALLBACK_BUDGET_MS}ms`);
+        return searchAllSources(query, {
+          ...localOptions,
+          totalTimeout: FALLBACK_BUDGET_MS,
+          signal: handlers.signal,
+        }).then((res) => {
+          if (res && res.stats) {
+            res.stats.engine = 'local-fallback';
+            res.stats.ofSources = local.total;
+          }
+          res.note = `主引擎不可用，已用本地引擎兜底（限时 ${Math.round(FALLBACK_BUDGET_MS / 1000)} 秒，可能只覆盖部分书源）`;
+          return res;
+        });
       });
   });
 }
@@ -890,7 +1243,18 @@ function startBookSearchJob(query) {
       job.revision++;
     }
     job.stats = result.stats || null;
-    job.done = job.total;
+    // 旧写法无条件把 done 拉满到 total：到时限提前收手时，
+    // 界面照样报「已搜 3370 / 3370 个源」，而实际只真搜了几百个——假完成。
+    // 现在 done 取引擎如实回报的「已结算源数」，并把提前收手单独标记出来。
+    const settled = Number(result.stats?.searched);
+    job.done = Number.isFinite(settled) && settled > 0 ? Math.min(settled, job.total) : job.total;
+    if (result.stats?.deadlineHit) {
+      job.deadlineHit = true;
+      job.note = `到总时限收手：${settled}/${job.total} 个源已搜完，其余未搜（已拿到的结果都在下面）`;
+    }
+    // 引擎侧说明（本地兜底、上游中途断开等）不能丢：界面要能区分
+    // 「只搜了一部分」与「全搜完了确实没有」。
+    if (result.note) job.note = [job.note, result.note].filter(Boolean).join('；');
     job.hits = job.grouped.length || result.stats?.unique || job.hits;
     job.sourcesWithResults = result.stats?.withResults || job.sourcesWithResults;
     job.sourcesWithNames = result.stats?.sourceNames || 0;
@@ -945,6 +1309,8 @@ function publicJob(job) {
     startedAt: job.startedAt,
     finishedAt: job.finishedAt,
     stats: job.stats,
+    deadlineHit: !!job.deadlineHit,
+    note: job.note || '',
     error: job.error,
   };
 }
@@ -1066,14 +1432,19 @@ async function openBookWithSources(body) {
   }
 
   // 多候选并行 race：前 3 个不同源同时起跑「详情 → 目录 → 首章」，先成功先用（lib/book_race）。
-  // 失败按阶段回灌健康账；全部失败再交给上层走 Reader 兜底。
+  // 失败按阶段回灌健康账；全部失败就直接报错，不再走 Reader 兜底。
   await awaitSourceCache();
   // 已知「能搜不能开」的源（返回空目录/无正文）不进打开候选，避免用户点第一本白等一轮超时；
   // 判定依据是实测：api.17k.com 搜索秒回但目录恒为空。健康账仍会记录它，长期降权。
   const OPEN_BAD_HOSTS = /api\.17k\.com/i;
+  // 判定要同时看「书源地址」和「这本书的地址」：
+  // 17K 的条目可能挂在普通书源名下，只查 source.url 会被它溜进打开候选，
+  // 白等一轮超时再报「只提供搜索」。
   const engineCandidates = ordered
     .map((c) => ({ sourceId: c.bookSourceUrl, source: getSourceByUrl(c.bookSourceUrl), bookUrl: c.bookUrl, name: c.name }))
-    .filter((c) => c.source && !OPEN_BAD_HOSTS.test(String(c.source.url || '')));
+    .filter((c) => c.source
+      && !OPEN_BAD_HOSTS.test(String(c.source.url || ''))
+      && !OPEN_BAD_HOSTS.test(String(c.bookUrl || '')));
   let lastError = null;
   const MAX_TRY = 8;
   if (!engineCandidates.length && ordered.length) {
@@ -1197,20 +1568,7 @@ async function openBookWithSources(body) {
     logLine(`engine race failed: ${lastError.message}（试了 ${(race.tried || []).length} 个源）`);
   }
 
-  // 引擎全军覆没且 Reader 健康时，仍按老规矩兜底一次（改造前该兜底在单源 openBook 里）。
-  if (await readerHealth()) {
-    const fallbackOrigin = body.bookSourceUrl || body.origin || (candidates[0] && candidates[0].bookSourceUrl);
-    try {
-      const out = await openBookViaReader(primaryBookUrl, fallbackOrigin);
-      out.engine = 'reader';
-      out.sourceUsed = out.sourceUsed || fallbackOrigin;
-      logLine('engine race failed, reader fallback ok');
-      return out;
-    } catch (readerError) {
-      logLine(`reader fallback failed: ${readerError.message || readerError}`);
-      lastError = readerError;
-    }
-  }
+  // ★ 2026-11-20：客厅不再通过 Reader 打开/解析任何书；本地引擎失败就直接报错。
   throw lastError || new Error('这本书没有可用的书源');
   } finally {
     releaseWarm();
@@ -1373,8 +1731,8 @@ async function openBook(bookUrl, bookSourceUrl) {
       logLine(`engine open failed (${source.name}): ${engineError.message || engineError}`);
     }
   }
-  if (await readerHealth()) return openBookViaReader(bookUrl, origin);
-  throw new Error(source ? `规则引擎打开失败：${source.name}` : '这本书没有可用的书源');
+  // ★ 2026-11-20：不再回落 Reader（只有它已经自己开着时才允许复用，现在连复用也去掉）
+  throw new Error(source ? `本地引擎打开失败：${source.name}` : '这本书没有可用的书源');
 }
 
 function contentToText(html) {
@@ -1417,8 +1775,8 @@ async function readChapter({ bookUrl, bookSourceUrl, chapterUrl, index, chapterT
 /** 正文：规则引擎优先，失败再回落 Reader /reader3。 */
 async function readChapterWithEngine(payload) {
   const origin = payload.bookSourceUrl || guessBookOrigin(payload.bookUrl);
-  // Reader 引擎优先：它会顺着书源的「下一页」把整章拼完，旧 Node 引擎经常只抓到
-  // 站点的一句提示（例如只有 7 个字的「您现在阅读的是」）却算成功。
+  // 本地引擎优先：searchd 会顺着书源的「下一页」把整章拼完，拿不到才用 Node 规则引擎。
+  // ★ 2026-11-20：两条都失败就报错，不再回落 Reader。
   try {
     const fast = await chapterContentViaSearchd({
       bookUrl: payload.bookUrl,
@@ -1450,12 +1808,8 @@ async function readChapterWithEngine(payload) {
     }
     logLine(`engine chapter failed (${source.name}): ${res.error || ('正文过短 ' + text.length + ' 字')}`);
   }
-  const fallback = await readChapter(payload, 10000);
-  if (fallback && fallback.content) {
-    fallback.content = cleanChapterText(fallback.content);
-    fallback.length = fallback.content.length;
-  }
-  return fallback;
+  // ★ 2026-11-20：不再回落 Reader /reader3；本地引擎拿不到正文就明确报错。
+  throw new Error('本地引擎没取到这一章；客厅不会用 Reader 取正文');
 }
 
 async function saveReadingProgress({ bookUrl, index, position }) {
@@ -1502,6 +1856,21 @@ async function appStatus(id) {
       webRunning: b.webRunning,
       appRunning: b.appRunning,
       busy: busy.has(id) && !b.webRunning,
+      // 三态必须透出到首页：SWR 把「慢」换成了「旧」，
+      // 只给 stats 不给 pending/stale，首页只能把 null 渲染成「—」+「书架还空着」= 假空。
+      // 与 /api/book/info 保持同一语义：pending=还在取、stale=给的是旧值、都没有=确实没有。
+      pending: !!b.pending,
+      stale: !!b.stale,
+      /* ★ 2026-11-22 补 untrusted / dbOk（运维管家 check_xendpoint 抓到）。
+       *   缺口后果：dbOk=false 且 TTL 未过期时 /api/book/info 给
+       *   untrusted=true / stale=false / sources=null，而 status 侧 untrusted 丢失、
+       *   stale=false ⇒ 前端五五客厅.html:902 的 blank=null ⇒ sourcesText 落到 '0'
+       *   ⇒ 首页显示「0 条书源」。这是「把没取到伪装成 0」的第三种假空，
+       *   与 sources、groupTotal 同源。跨端点同一份数据，字段集合必须一致。 */
+      untrusted: !!b.untrusted,
+      dbOk: b.dbOk !== false,
+      ageMs: b.ageMs == null ? null : b.ageMs,
+      degraded: false,
       stats: {
         sources: b.sources,
         lastBook: b.lastBook,
@@ -1529,8 +1898,9 @@ async function appStatus(id) {
         return { total: d.pool.total, active: d.pool.active };
       });
     } else if (id === 'music') {
+      // probe 已经证明它能回包，这里只为拿明细；超时跟 probe 保持一致，别单独放大到 5s
       stats = await cachedExtra(id, 20000, async () => {
-        const d = await getJson(app.base + '/api/health', 5000);
+        const d = await getJson(app.base + '/api/health', 800);
         return { ok: !!d.ok, sources: 2 };
       });
     }
@@ -1546,6 +1916,11 @@ async function appStatus(id) {
     base: app.base,
     running: p.running,
     latency: p.ms,
+    // degraded：上游不可信（熔断中或刚连续失败）。界面据此显示「状态未知」，
+    // 不能把「探不到」说成「已停止」——那是静默失败。
+    degraded: !!p.degraded,
+    breakerOpen: !!p.breakerOpen,
+    retryInMs: p.retryInMs || 0,
     busy: busy.has(id) && !p.running,
     stats,
   };
@@ -1580,27 +1955,21 @@ function startApp(id) {
   if (!app) return { ok: false, message: '没有这个项目' };
 
   if (id === 'book') {
-    const bundle = app.bundle || 'Reader';
-    if (!fs.existsSync(`/Applications/${bundle}.app`)) {
-      return { ok: false, message: '没有找到 Reader.app' };
-    }
-    if (busy.has('book')) return { ok: true, message: '书房引擎正在启动中' };
-    markBusy('book');
-    bookCache.t = 0;
-    ensureReaderWeb()
-      .then((ok) => {
-        if (ok) busy.delete('book');
-        logLine('book engine start ' + (ok ? 'ok' : 'timeout'));
-      })
-      .catch((e) => logLine('book engine start error: ' + e.message));
-    return { ok: true, message: '正在启动书房引擎' };
+    // 书房没有「启动」这回事：页面常驻，Reader 引擎可选且**永不**由客厅拉起
+    bookCache.t = 0; // 标记过期：下次请求先给旧值，同时后台补新（不阻塞）
+    void kickBookRefresh();
+    return { ok: true, message: '书房不用启动；客厅不会打开 Reader，直接用本地引擎' };
   }
 
   if (app.kind !== 'web') return { ok: false, message: '这个项目没有可启动的服务' };
   if (busy.has(id)) return { ok: true, message: '正在启动中' };
   markBusy(id);
   extraCache.delete(id);
+  invalidateProcessRunning(); // 刚拉起一个服务，进程探测结果立刻作废
+  resetProbeBreaker(app.base); // 用户手动启动了：立刻允许重新探测，别被 60s 熔断挡住
   const r = runScript(app, app.startArg || 'start');
+  bookCache.t = 0;
+  void kickBookRefresh();
   return r.ok ? { ok: true, message: '已发出启动指令' } : { ok: false, message: r.message };
 }
 
@@ -1613,8 +1982,35 @@ function stopApp(id) {
   if (app.kind !== 'web') return { ok: false, message: '这个项目没有可停的服务' };
   const r = runScript(app, app.stopArg || 'stop');
   extraCache.delete(id);
+  invalidateProcessRunning(); // 刚停了一个服务，进程探测结果立刻作废
+  resetProbeBreaker(app.base);
   bookCache.t = 0;
-  return r.ok ? { ok: true, message: '已停止' } : { ok: false, message: r.message };
+  void kickBookRefresh();
+  /* ★ 2026-11-22 修「停止 = 永久取消托管」的语义误导（实测代价：8811 停了 13 分钟）。
+   *
+   *   实测因果链（launchd 日志逐层可查）：
+   *     POST /api/stop {id:'music'}
+   *       → stopApp('music')
+   *       → runScript(app,'stop')  → bash music.sh stop
+   *       → launchctl bootout gui/501/com.wuwu.lingting.web
+   *     launchd 日志：bootout initiated by: launchctl[12422]<-bash[12414]<-node[10249]
+   *     紧接着：service inactive / removing service
+   *
+   *   问题不在 bootout 本身（「停止」确实该停），而在于：
+   *     · 该服务配了 KeepAlive=1，用户的合理预期是「停了会被自动拉起」；
+   *     · 但 bootout 是**把服务从 launchd 注销**，KeepAlive 随之失效，
+   *       只有再次 start（bootstrap）才会重新托管。
+   *   于是「停止」实际是「永久停止」，界面上却只写「已停止」。
+   *
+   *   修法：把后果显式写进返回体，让前端能如实告知用户怎么恢复。
+   *   不改 bootout 行为（那是各工程自己的 stop 语义），只消除「已停止」这个假承诺。 */
+  if (!r.ok) return { ok: false, message: r.message };
+  return {
+    ok: true,
+    message: '已停止（托管已取消，不会自动拉起；点「启动」可重新托管）',
+    wasManaged: true,
+    resumeHint: '点「启动」重新交给 launchd 托管',
+  };
 }
 
 /* ───────────────────────── 单端口转发 ───────────────────────── */
@@ -1649,14 +2045,18 @@ function proxyError(res, app) {
   const name = app && app.name ? app.name : '这间屋子';
   const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8">
 <title>${name} · 暂时没开</title>
+<script>(function(){try{if(window.top!==window)document.documentElement.setAttribute('data-embedded','1');}catch(e){document.documentElement.setAttribute('data-embedded','1');}})();</script>
 <style>
 html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#0b0c0e;color:#efe9df;
 font:14px/1.9 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;text-align:center}
 h1{font:600 26px/1.3 "Songti SC",serif;margin:0 0 10px}p{color:#918c83;margin:0 0 22px}
 .ww-home{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid rgba(255,255,255,.06);border-radius:8px;font-size:12px;letter-spacing:.1em;color:#8b8b8b;text-decoration:none;line-height:1}
 .ww-home:hover{color:#efe9df;border-color:rgba(255,255,255,.18)}
+html[data-embedded] .ww-home{display:none}
 </style><body><div><h1>${name}暂时没开</h1><p>客厅没连上里面的服务。回客厅点一下这扇门，它会自己启动。</p>
-<a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a></div></body></html>`;
+<a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a></div>
+<script>(function(){var a=document.querySelector('.ww-home');if(a)a.addEventListener('click',function(e){try{if(window.top!==window){e.preventDefault();window.parent.postMessage({type:'wuwu:close'},location.origin);}}catch(_){}});})();</script>
+</body></html>`;
   sendHtml(res, html, 502);
 }
 
@@ -1903,7 +2303,7 @@ function injectVodNote(html) {
 
 /* ── 视频房海报代理：/api/vod/img?u=<原始图片地址>
    采集站海报常带防盗链/证书问题，这里统一取一次、落盘缓存，前端只吃本地缓存。 ── */
-const VOD_IMG_DIR = path.join(ROOT, 'runtime', 'vod', 'posters');
+const VOD_IMG_DIR = path.join(RUNTIME_DIR, 'vod', 'posters');
 async function serveVodImage(res, rawUrl) {
   let u = String(rawUrl || '').trim();
   if (!/^https?:\/\//i.test(u)) {
@@ -1938,8 +2338,15 @@ async function serveVodImage(res, rawUrl) {
     const ct = (r.headers.get('content-type') || 'image/jpeg').split(';')[0];
     if (!/^image\//i.test(ct)) return sendJson(res, 502, { ok: false, message: '不是图片：' + ct });
     try {
-      fs.writeFileSync(cached, buf);
-      fs.writeFileSync(cached + '.type', ct);
+      // 必须先写临时文件再 rename：命中判定只要求 stat.size > 0，
+      // 直写被中断会留下半截图，而半截图 size 也大于 0 —— 之后每次请求都命中它，
+      // 用户看到的是永久损坏的海报，且不会自动重取。
+      const tmp = `${cached}.${process.pid}.${Math.random().toString(16).slice(2, 8)}.tmp`;
+      fs.writeFileSync(tmp, buf);
+      fs.renameSync(tmp, cached);
+      const typeTmp = `${cached}.type.${process.pid}.tmp`;
+      fs.writeFileSync(typeTmp, ct);
+      fs.renameSync(typeTmp, cached + '.type');
     } catch { /* 缓存失败不影响本次响应 */ }
     res.writeHead(200, { 'content-type': ct, 'content-length': String(buf.length), 'cache-control': 'public, max-age=86400', 'x-img-cache': 'miss' });
     return res.end(buf);
@@ -2162,12 +2569,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/book/ensure' && req.method === 'POST') {
-      const ok = await ensureReaderWeb();
-      bookCache.t = 0;
-      return sendJson(res, ok ? 200 : 503, {
+      // 只检查 Reader Web 现在在不在，绝不启动 Reader.app
+      const ok = await readerHealth();
+      bookCache.t = 0; // 标记过期 + 后台刷新（这次请求不再等 python）
+      void kickBookRefresh();
+      return sendJson(res, 200, {
         ok,
         webRunning: ok,
-        message: ok ? '书房引擎已就绪' : '书房引擎没有起来，请确认 Reader.app 已安装且 Web 阅读服务已启用',
+        message: ok ? 'Reader 引擎已在运行' : 'Reader 未运行；客厅不会启动它，书房用本地引擎',
       });
     }
 
@@ -2239,6 +2648,11 @@ const server = http.createServer(async (req, res) => {
         logLine('book title search error: ' + (e.stack || e.message || e));
         return sendJson(res, 502, { ok: false, items: [], message: '搜书失败：' + (e.message || e) });
       }
+    }
+
+    if (p === '/api/book/groups') {
+      const out = await bookGroups();
+      return sendJson(res, 200, { ok: !out.error, groups: out.groups, total: out.groups.length, error: out.error || null });
     }
 
     if (p === '/api/book/search') {
@@ -2333,8 +2747,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/start-all' && req.method === 'POST') {
       const results = {};
       for (const id of ORDER) {
-        if (!apps[id]) continue;
-        if (id === 'book' || apps[id].kind === 'web') results[id] = startApp(id);
+        // 书房不在这里「启动」：它的页面常驻，Reader 只是可选解析引擎，
+        // 一键启动不该顺手把 Reader 窗口弹出来；书房用本地引擎，没有启动按钮。
+        if (!apps[id] || id === 'book') continue;
+        if (apps[id].kind === 'web') results[id] = startApp(id);
       }
       return sendJson(res, 200, { ok: true, results });
     }
@@ -2347,16 +2763,48 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === '/api/reader/open' && req.method === 'POST') {
-      const b = await bookInfo();
-      if (!b.installed) return sendJson(res, 400, { ok: false, message: '没有找到 Reader.app' });
-      execFile('/usr/bin/open', ['-a', 'Reader'], (err) => {
-        if (err) logLine('open reader failed: ' + err.message);
-      });
-      return sendJson(res, 200, { ok: true, message: '正在打开阅读器' });
+      // 这个接口原来会 open -a Reader；按“客厅永不开 Reader”的要求直接封掉
+      return sendJson(res, 403, { ok: false, message: '客厅不再打开 Reader' });
     }
 
     if (p === '/api/ping') {
-      return sendJson(res, 200, { ok: true, service: 'wuwu-living-room', port: PORT, ts: Date.now() });
+      // snapshot：哪些页是启动快照、快照时磁盘是什么时候、现在磁盘是什么时候。
+      // 判据：diskMtime > snapshotMtime ⇒ 该页改了但没重启，页面仍是旧版。
+      const snapshot = {};
+      const stalePages = [];
+      for (const [name, info] of Object.entries(SNAPSHOT_INFO)) {
+        const abs = path.join(ROOT, 'public', name);
+        let diskMs = null, diskHash = null;
+        try {
+          const buf = fs.readFileSync(abs);
+          diskMs = fs.statSync(abs).mtimeMs;
+          diskHash = _sha12(buf);
+        } catch { /* 文件被删：stale 保持 false，由「读不到」另行表达 */ }
+        // ★ 判 stale 只认内容哈希；mtime 仅作展示。
+        //   touch 不改内容 → hash 相同 → 不报 stale（修掉误报）。
+        const stale = diskHash !== null && info.hash !== null && diskHash !== info.hash;
+        snapshot[name] = {
+          snapshotAt: new Date(info.mtimeMs).toISOString(),
+          diskAt: diskMs === null ? null : new Date(diskMs).toISOString(),
+          snapshotHash: info.hash,
+          diskHash,
+          stale,
+        };
+        if (stale) stalePages.push(name);
+      }
+      return sendJson(res, 200, {
+        ok: true,
+        service: 'wuwu-living-room',
+        port: PORT,
+        ts: Date.now(),
+        snapshotAt: new Date(SNAPSHOT_AT).toISOString(),
+        snapshotPages: SNAPSHOT_PAGES.map((p) => p.name),
+        snapshot,
+        stalePages,
+        staleNote: stalePages.length
+          ? `这些页改了但未重启，线上仍是旧版：${stalePages.join(' / ')}`
+          : '快照页与磁盘一致',
+      });
     }
 
     /* 站点图标：浏览器会自动请求 /favicon.ico，这里统一给一个，避免 404 噪音 */
@@ -2419,7 +2867,10 @@ const server = http.createServer(async (req, res) => {
         return res.writeHead(308, { location: prefix + '/' + url.search }).end();
       }
       if (p.startsWith(prefix + '/')) {
-        return proxy(req, res, id, app, prefix);
+        // 必须 await：handler 是 async，`return promise` 不会把 rejection 交给外层 catch。
+        // 旧写法的后果是实测过的——代理路径上请求体超限时 readRaw 抛错逃出 try，
+        // 既不回 413 也不关连接，客户端 curl 一直挂到超时（status=000, exit=28）。
+        return await proxy(req, res, id, app, prefix);
       }
     }
 
@@ -2428,12 +2879,27 @@ const server = http.createServer(async (req, res) => {
     if (res.headersSent || res.writableEnded) return;
     return sendJson(res, 404, { ok: false, message: '没有这个页面' });
   } catch (e) {
+    // 请求体类错误（非法 JSON / 超限）是客户端问题，不是客厅故障：
+    // 必须回 400/413 并带上可读原因，否则前端只能看到「缺少书名」这种误导信息。
+    if (e instanceof BodyError || Number(e && e.statusCode) >= 400) {
+      const code = Number(e.statusCode) || 400;
+      logLine(`bad request: ${req.method} ${req.url} → ${code} ${e.message || ''}`);
+      if (!res.headersSent) return sendJson(res, code, { ok: false, message: e.message || '请求不合法' });
+      return;
+    }
     logLine('http error: ' + (e && e.stack ? e.stack : e));
     if (!res.headersSent) {
       return sendJson(res, 500, { ok: false, message: '客厅内部出错了：' + String(e.message || e) });
     }
     res.destroy();
   }
+});
+
+// 监听失败单独兜底：确保一定以非 0 退出。这是 launchd KeepAlive 能重启的前提。
+server.on('error', (e) => {
+  try { _appendLog('book-search.log', `[${new Date().toISOString()}] server.error: ${e && e.code} ${e && e.message}\n`); } catch { /* ignore */ }
+  console.error('[server.error]', e && e.code, e && e.message);
+  process.exit(1);
 });
 
 server.listen(PORT, BIND, () => {

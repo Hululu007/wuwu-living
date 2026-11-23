@@ -7,47 +7,63 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='28' font-family='serif' fill='%237fb4c4' text-anchor='middle'%3E相%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/assets/room.css">
 <style>
-  .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
   .month{margin-top:26px}
-  .month-h{display:flex;align-items:baseline;gap:9px;margin:0 0 11px}
-  .month-h h2{margin:0;font-size:14px;font-weight:600;letter-spacing:.06em;color:var(--ink);white-space:nowrap}
+  .month-h{display:flex;align-items:baseline;gap:9px;margin:0 0 11px;padding-bottom:8px;border-bottom:1px solid var(--line2)}
+  .month-h h2{margin:0;font-family:var(--serif);font-size:16px;font-weight:600;letter-spacing:.06em;color:var(--ink);white-space:nowrap}
   .month-h .n{font-size:11px;color:var(--faint);white-space:nowrap}
   .ph{
-    position:relative;display:block;cursor:pointer;border-radius:10px;overflow:hidden;
+    position:relative;display:block;cursor:pointer;border-radius:2px;overflow:hidden;
     border:1px solid var(--line);background:rgba(255,255,255,.03);transition:.18s;
   }
-  .ph:hover{border-color:var(--edge);transform:translateY(-1px)}
-  .ph img{width:100%;height:132px;object-fit:cover;background:#0e1013}
+  .ph:hover{border-color:var(--edge)}
+  .ph img{width:100%;height:150px;object-fit:cover;background:var(--sunken)}
   .ph .cap{
-    position:absolute;left:0;right:0;bottom:0;padding:16px 8px 6px;font-size:10px;color:var(--ink);
+    position:absolute;left:0;right:0;bottom:0;padding:18px 9px 7px;font-size:11px;color:var(--ink);
     background:linear-gradient(180deg,transparent,rgba(0,0,0,.72));
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   .ph .kind{
-    position:absolute;top:7px;left:7px;font-size:9px;letter-spacing:.08em;color:var(--a);
+    position:absolute;top:7px;left:7px;font-size:11px;letter-spacing:.08em;color:var(--a);
     background:rgba(11,12,14,.62);border:1px solid var(--edge);border-radius:5px;padding:1px 6px;
   }
-  .ph .loading-thumb{height:132px;display:flex;align-items:center;justify-content:center}
+  .ph .loading-thumb{height:150px;display:flex;align-items:center;justify-content:center}
   .ph .play{
     position:absolute;inset:0;margin:auto;width:30px;height:30px;border-radius:50%;z-index:2;
     display:flex;align-items:center;justify-content:center;background:rgba(11,12,14,.55);
     color:#fff;font-size:12px;pointer-events:none;
   }
   .vfall{
-    height:132px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-    padding:10px 12px;background:linear-gradient(160deg,#171a1f,#0e1013);color:var(--muted);
+    height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    padding:10px 12px;background:linear-gradient(160deg,#171a1f,var(--sunken));color:var(--muted);
   }
   .vfall .play{position:static;margin:0}
   .vfall .vfn{font-size:11px;color:var(--ink);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .vfall .vdur{font-size:10px;color:var(--faint)}
+  .vfall .vdur{font-size:11px;color:var(--faint)}
   .toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
   .chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
   .stat-inline{font-size:11px;color:var(--faint);letter-spacing:.04em}
   .notice{
-    margin:10px 0 0;padding:9px 12px;border:1px dashed var(--line);border-radius:9px;
+    margin:10px 0 0;padding:9px 12px;border:1px dashed var(--line);border-radius:2px;
     font-size:11.5px;color:var(--muted);line-height:1.8;
   }
-  .notice.warn{border-color:rgba(214,160,94,.35);color:#d8c49e}
+  .notice.warn{border-color:rgba(202,181,73,.30);color:#d8c49e}
+  .notice.fold{padding:0;border:0;background:none;line-height:1.7}
+  .notice.fold details{border:1px dashed var(--line);border-radius:2px;background:rgba(255,255,255,.018)}
+  .notice.fold details.warn{border-color:rgba(202,181,73,.30)}
+  .notice.fold summary{
+    list-style:none;cursor:pointer;padding:9px 12px;display:flex;align-items:center;gap:7px;
+    color:var(--muted);font-size:11.5px;
+  }
+  .notice.fold summary::-webkit-details-marker{display:none}
+  .notice.fold summary b{font-weight:500;color:var(--ink)}
+  .notice.fold summary span{min-width:0;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .notice.fold summary em{font-style:normal;margin-left:auto;font-size:11px;color:var(--faint);flex:0 0 auto}
+  .notice.fold details[open] summary em::before{content:"收起"}
+  .notice.fold details:not([open]) summary em::before{content:"展开"}
+  .notice.fold .nb{padding:0 12px 11px;border-top:1px solid var(--line2);padding-top:9px}
+  .notice.fold .nb div{padding:2px 0}
+  .notice.fold .nb code{font-family:"SF Mono",Menlo,monospace;font-size:11px;color:var(--a);word-break:break-all}
   .progress{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
   .progress .bar{flex:1;min-width:160px;max-width:320px}
   .progress .msg{font-size:11px;color:var(--faint)}
@@ -82,11 +98,18 @@
   }
   .dlna-dev.on{border-color:var(--edge);background:var(--soft)}
   .dlna-dev .nm{font-size:13px;color:var(--ink)}
-  .dlna-dev .loc{font-size:10px;color:var(--faint);margin-top:2px;word-break:break-all}
+  .dlna-dev .loc{font-size:11px;color:var(--faint);margin-top:2px;word-break:break-all}
   .dlna-empty{padding:18px 12px;border:1px dashed var(--line);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.9;text-align:center}
   .linkrow{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
-  .linkrow code{flex:1;min-width:180px;font-size:10.5px;color:var(--faint);word-break:break-all;background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:7px;padding:8px 10px}
-  @media (max-width:620px){.ph img{height:104px}.wall{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}}
+  .linkrow code{flex:1;min-width:180px;font-size:11px;color:var(--faint);word-break:break-all;background:rgba(255,255,255,.04);border:1px solid var(--line2);border-radius:7px;padding:8px 10px}
+  @media (max-width:620px){
+    .ph img,.ph .loading-thumb,.vfall{height:104px}
+    .wall{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:7px}
+    .month-h h2{font-size:15px}
+    .top-act{width:100%}
+    .notice.fold summary{font-size:11px}
+    .notice.fold .nb{font-size:11px}
+  }
 </style>
 </head>
 <body data-room="photos">
@@ -94,7 +117,7 @@
 
 <div class="wrap">
   <header class="top">
-    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="回客厅"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
     <div class="titlebar">
       <h1><i></i>相册</h1>
       <span class="sub">下载、桌面、图片目录里的相片，按年月排开</span>
@@ -112,7 +135,7 @@
   </header>
 
   <section class="lede">
-    <p>只读取本地目录，不改动原始文件；缩略图单独存在 runtime/photos/。<br>拍摄时间优先取 EXIF / 影片元数据，取不到就用文件修改时间。</p>
+    <p>只读本地目录，不改动原图；按拍摄月份排开。</p>
     <div class="figs">
       <div class="fig"><b id="fTotal">—</b><span>个文件</span></div>
       <div class="fig"><b id="fMonths">—</b><span>个月份</span></div>
@@ -207,6 +230,9 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="/assets/toast.js"></script>
+<script src="/assets/notify-panel.js" data-ww-history="消息记录"></script>
+  <script src="/assets/fetch-timeout.js"></script>
 <script>
 (function () {
   'use strict';
@@ -216,13 +242,6 @@
   };
   var $ = function (s, el) { return (el || document).querySelector(s); };
 
-  function toast(msg, err) {
-    var t = $('#toast');
-    t.textContent = msg;
-    t.className = 'toast on' + (err ? ' err' : '');
-    clearTimeout(toast._t);
-    toast._t = setTimeout(function () { t.className = 'toast'; }, 2400);
-  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -334,7 +353,7 @@
     S.loading = true; $('#loading').hidden = false;
     var u = '/api/photos/list?offset=' + S.offset + '&limit=60';
     if (S.month) u += '&month=' + encodeURIComponent(S.month);
-    fetch(u, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+    wwFetch(u, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d.ok) throw new Error(d.message || '读取失败');
       S.total = d.total; S.months = d.months || [];
       appendItems(d.items || []);
@@ -348,7 +367,7 @@
       $('#updated').textContent = '更新于 ' + new Date().toTimeString().slice(0, 8);
       renderSkipped(d.skipped || []);
     }).catch(function (e) {
-      $('#wall').innerHTML = '<div class="empty"><b>相片没读出来</b><span>' + esc(e.message || e) + '</span></div>';
+      $('#wall').innerHTML = '<div class="empty error"><b>相片没读出来</b><span>' + esc(e.message || e) + '</span></div>';
     }).finally(function () { S.loading = false; $('#loading').hidden = true; });
   }
 
@@ -356,14 +375,24 @@
     var el = $('#skippedNotice');
     if (!skipped.length) { el.hidden = true; return; }
     el.hidden = false;
-    el.innerHTML = skipped.map(function (s) {
-      return '· ' + esc(s.dir) + '：' + esc(s.reason);
-    }).join('<br>');
+    el.className = 'notice fold';
+    // ★ 2026-11-22 按 S4 契约第③类补「用户能做什么」：
+    //   原来只报「受保护目录不会被读取」，用户不知道这是可以解决的。
+    //   判据要求：后端中文原因原样透出 + 给操作指引（这里给系统设置入口）。
+    //   注意不给「重试」按钮 —— 重试 100 次也不会获得 TCC 权限（契约 ③-2）。
+    el.innerHTML = '<details><summary><b>' + skipped.length + ' 个目录没读到</b>' +
+      '<span>系统相册等受保护目录不会被读取</span><em></em></summary>' +
+      '<div class="nb">' + skipped.map(function (s) {
+        return '<div>· ' + esc(s.dir) + '：' + esc(s.reason) + '</div>';
+      }).join('') +
+      '<div style="margin-top:8px;color:var(--muted)">想读这些目录：打开「系统设置 → 隐私与安全性 → 照片」，' +
+      '把运行客厅的程序加进去，然后重启客厅。这不是网络问题，重试不会有用。</div>' +
+      '</div></details>';
   }
 
   /* ── 扫描进度 ── */
   function pollStatus() {
-    fetch('/api/photos/scan-status', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+    wwFetch('/api/photos/scan-status', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
       var st = d.status || {};
       if (!st.running && st.phase !== 'done' && st.phase !== 'idle') return;
       var box = $('#progress');
@@ -385,10 +414,12 @@
   }
 
   $('#btnScan').onclick = function () {
-    fetch('/api/photos/scan', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
-      toast(d.ok ? '开始后台扫描' : '扫描没启动');
+    wwFetch('/api/photos/scan', { method: 'POST', timeout: 30000 }).then(function (r) { return r.json(); }).then(function (d) {
+      // ★ 2026-11-22 修「两分支同一外观」：原来成功/失败都是单参 toast()，
+      //   视觉完全一致，用户看不出扫描到底启没启动。现在失败走 err。
+      if (d.ok) toast('开始后台扫描', 'info'); else toast(d.message || '扫描没启动', 'err');
       pollStatus();
-    }).catch(function (e) { toast(e.message, true); });
+    }).catch(function (e) { toast(wwDescribeError(e), 'err'); });
   };
 
   /* ── 大图 ── */
@@ -418,7 +449,7 @@
     $('#lbDims').textContent = it.duration ? fmtDur(it.duration) : '';
     $('#lbDownload').href = '/api/photos/full?id=' + it.id;
     $('#lbDownload').setAttribute('download', it.name);
-    fetch('/api/photos/info?id=' + it.id).then(function (r) { return r.json(); }).then(function (d) {
+    wwFetch('/api/photos/info?id=' + it.id).then(function (r) { return r.json(); }).then(function (d) {
       if (!d.ok || d.item.id !== it.id) return;
       if (d.item.dims) $('#lbDims').textContent = d.item.dims.width + '×' + d.item.dims.height;
     }).catch(function () {});
@@ -465,15 +496,18 @@
 
   /* ── 本机网络 ── */
   function loadLan() {
-    return fetch('/api/photos/lan').then(function (r) { return r.json(); }).then(function (d) {
+    return wwFetch('/api/photos/lan').then(function (r) { return r.json(); }).then(function (d) {
       S.lan = d;
       var el = $('#lanNotice');
       if (d.lanMode) {
         el.hidden = true;
       } else {
         el.hidden = false;
-        el.innerHTML = '当前客厅只监听 127.0.0.1，电视访问不到本机直链；只有用 <code>--lan</code> 方式启动（监听 0.0.0.0）时投屏才真正连通。探测到的本机局域网 IP：' +
-          (d.lanIP || '未识别') + '，端口 ' + d.port + '。';
+        el.className = 'notice warn fold';
+        el.innerHTML = '<details class="warn"><summary><b>电视暂时连不到这台电脑</b>' +
+          '<span>客厅只在 127.0.0.1 上监听</span><em></em></summary>' +
+          '<div class="nb">只有用 <code>--lan</code> 方式启动（监听 0.0.0.0）时投屏才真正连通。' +
+          '探测到的本机局域网 IP：' + esc(d.lanIP || '未识别') + '，端口 ' + esc(d.port) + '。</div></details>';
       }
     }).catch(function () {});
   }
@@ -485,10 +519,10 @@
 
   function copyText(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () { toast('直链已复制'); }).catch(function () { toast('复制失败', true); });
+      navigator.clipboard.writeText(text).then(function () { toast('直链已复制', 'good'); }).catch(function () { toast('复制失败', 'err'); });
     } else {
       var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
-      ta.select(); try { document.execCommand('copy'); toast('直链已复制'); } catch { toast('复制失败', true); }
+      ta.select(); try { document.execCommand('copy'); toast('直链已复制', 'good'); } catch { toast('复制失败', 'err'); }
       document.body.removeChild(ta);
     }
   }
@@ -518,7 +552,7 @@
   function discover() {
     $('#castHint').textContent = '正在监听 SSDP 应答…';
     $('#dlnaDevices').innerHTML = ''; $('#dlnaEmpty').hidden = true;
-    fetch('/api/photos/dlna/discover', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
+    wwFetch('/api/photos/dlna/discover', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (d) {
       $('#castHint').textContent = d.lanIP ? '本机局域网 IP：' + d.lanIP : '未识别到局域网 IP';
       var devs = d.devices || [];
       if (!devs.length) { $('#dlnaEmpty').hidden = false; $('#btnDoCast').disabled = true; return; }
@@ -560,16 +594,16 @@
   $('#btnDoCast').onclick = function () {
     if (!S.selectedDevice || !S.currentId) return;
     var btn = this; btn.disabled = true;
-    fetch('/api/photos/dlna/cast', {
+    wwFetch('/api/photos/dlna/cast', {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ deviceId: S.selectedDevice, id: S.currentId }),
     }).then(function (r) { return r.json(); }).then(function (d) {
-      if (d.ok) { toast(d.message || '已发送到电视'); closeCast(); }
+      if (d.ok) { toast(d.message || '已发送到电视', 'good'); closeCast(); }
       else {
-        toast(d.message || '投屏未成功', true);
+        toast(d.message || '投屏未成功', 'err');
         if (d.warning) $('#castStatus').textContent = d.warning;
       }
-    }).catch(function (e) { toast(e.message, true); }).finally(function () { btn.disabled = false; });
+    }).catch(function (e) { toast(wwDescribeError(e), 'err'); }).finally(function () { btn.disabled = false; });
   };
 
   /* ── 事件 ── */

@@ -1,0 +1,27 @@
+<!doctype html><html><body>
+<a class="brand" href="/" aria-label="五五客厅首页"><span>55</span></a>
+<div class="directory">
+<div class="room-row" data-id="magnet" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="book" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="music" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="vod" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="download" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="library" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="notes" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="calendar" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="photos" role="button" aria-label="打开房间"><span>房</span></div>
+<div class="room-row" data-id="cast" role="button" aria-label="打开房间"><span>房</span></div>
+</div>
+<a class="ww-home" href="/" title="回客厅" aria-label="回客厅"><span>回客厅</span></a>
+<div class="empty">暂无</div><div class="loading">加载中</div><div class="error">出错</div>
+<div class="note">还有 12 条</div>
+<div class="na">该功能不可用</div>
+<script>
+
+fetch('/api/x').catch(function(e){toast(e.message)})
+</script>
+<script src="assets/toast.js"></script>
+<div class="empty unavailable"><b>服务没在运行</b><button type="button">启动</button></div>
+<style>.x{color:rgba(226,60,48,.45)}</style>
+<button type="button" data-ww-history>消息</button>
+</body></html>

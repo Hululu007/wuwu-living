@@ -5,3 +5,12 @@ runtime/
 config/apps.json
 *.part
 .env
+
+# 手工备份与本机产物（不进版本库）
+_bak/
+_ops-backups/
+preview/
+docs/screens/
+*.bak
+*.bak-*
+*.bak.*

@@ -29,6 +29,7 @@
     var board = document.createElement('div');
     board.id = 'vr-board';
     viewPane.insertBefore(board, viewPane.firstChild);
+    if (empty) empty.style.display = 'none';
 
     var collapsed = false;
     function collapse() {
@@ -41,7 +42,7 @@
     var listBox = document.querySelector('#list');
     if (listBox && window.MutationObserver) {
       new MutationObserver(function () {
-        if (listBox.querySelector('.item')) collapse();
+        if (listBox.querySelector('.item:not(.sk-item)')) collapse();
       }).observe(listBox, { childList: true, subtree: true });
     }
     var detailBox = document.querySelector('#detail');
@@ -56,7 +57,19 @@
   }
 
   function load(board, empty) {
-    fetch(RECS_URL, { headers: { accept: 'application/json' } })
+    // ★ 2026-11-22：原先这里用裸 fetch，拿的是 8 秒默认超时，冷路径必然被砍。
+    //
+    // 超时值怎么定（实测，不是拍脑袋）：
+    //   · 服务端 `lib/vod_recs.mjs:35` 有请求级硬预算 TOTAL_BUDGET_MS = 6000，
+    //     所以这个接口的响应时间**有确定上界 6s**，不会无限拖。
+    //   · 隔离实例（:19078，每次杀进程重建 runtime 造真冷）八次实测：
+    //     4.821 / 5.067 / 5.121 / 5.169 / 5.181 / 5.234 / 5.312 / 5.418s
+    //     最坏 5.418s —— 已经贴着 6000ms 硬预算。
+    //   · 因此客户端**不能**也设 6000：实测 6s 客户端超时下冷打 5.504s 返回，
+    //     只剩 0.5s 余量，任何一次上游稍慢就会被掐断，退回「要点两次」。
+    //   取 12000ms：对最坏冷路径有 2.2 倍余量，同时仍是硬上限（真挂住也只转 12s，
+    //   不是原来的 20s）。后端建议的 6000 不采纳，理由是它与服务端预算等值、没有余量。
+    wwFetch(RECS_URL, { headers: { accept: 'application/json' }, timeout: 12000 })
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (!data || data.ok === false) {
@@ -95,6 +108,47 @@
   function posterUrl(pic) {
     if (!pic) return '';
     return IMG_BASE + '?u=' + encodeURIComponent(pic);
+  }
+
+  function renderIntro(board, data) {
+    var intro = el('div', 'vr-intro');
+    intro.appendChild(el('span', 'vr-eyebrow', 'FIVE FIVE · SCREENING ROOM'));
+    intro.appendChild(el('h1', 'vr-h1', '今晚，挑一部。'));
+    intro.appendChild(el('p', 'vr-sub', '多源片库，线路自己挑。挑一张海报，剩下的交给放映室。'));
+
+    var sources = Array.isArray(data.sources) ? data.sources : [];
+    var ok = sources.filter(function (s) { return s.ok; }).length;
+    var total = 0;
+    (Array.isArray(data.sections) ? data.sections : []).forEach(function (sec) {
+      total += Number(sec.count || 0);
+    });
+
+    var stats = el('div', 'vr-stats');
+    if (ok) {
+      var live = el('span', 'on');
+      live.appendChild(el('i'));
+      live.appendChild(el('span', null, ok + ' / ' + sources.length + ' 个源在线'));
+      stats.appendChild(live);
+      stats.appendChild(el('span', 'sep', '/'));
+    }
+    if (total) stats.appendChild(el('span', null, '片库 ' + total + ' 部'));
+    if (total) stats.appendChild(el('span', 'sep', '/'));
+    stats.appendChild(el('span', null, '自动换源 · HLS'));
+    intro.appendChild(stats);
+    board.appendChild(intro);
+  }
+
+  function renderIntroSkeleton(board) {
+    var intro = el('div', 'vr-intro vr-intro-skel');
+    intro.appendChild(el('span', 'vr-eyebrow', 'FIVE FIVE · SCREENING ROOM'));
+    intro.appendChild(el('h1', 'vr-h1', '今晚，挑一部。'));
+    intro.appendChild(el('p', 'vr-sub', '正在把片库搬进来…'));
+    var stats = el('div', 'vr-stats');
+    stats.appendChild(el('span', null, '多源片库'));
+    stats.appendChild(el('span', 'sep', '/'));
+    stats.appendChild(el('span', null, '自动换源 · HLS'));
+    intro.appendChild(stats);
+    board.appendChild(intro);
   }
 
   function makeCard(it, big) {
@@ -153,7 +207,7 @@
 
   function firstChar(name) {
     var s = String(name || '');
-    return s ? s.trim().charAt(0) : '🎬';
+    return s ? s.trim().charAt(0) : '片';
   }
 
   function openRecsItem(it) {
@@ -161,11 +215,12 @@
     var item = {
       name: it.name,
       year: it.year || '',
-      area: '',
+      area: it.area || '',
       type: it.typeName || '',
       remarks: it.remarks || '',
       score: it.score || '',
       blurb: '',
+      pic: it.pic || '',
       sources: [{ id: it.vodId, source: it.sourceId }]
     };
     window.openItem(item, null);
@@ -173,6 +228,7 @@
 
   function renderBoard(board, data) {
     board.innerHTML = '';
+    renderIntro(board, data);
 
     // 顶部精选
     var featured = Array.isArray(data.featured) ? data.featured : [];
@@ -229,6 +285,7 @@
 
   function renderSkeleton(board) {
     board.innerHTML = '';
+    renderIntroSkeleton(board);
     var feat = el('section', 'vr-feat');
     var fh = el('div', 'vr-feat-h');
     fh.appendChild(el('span', 'dot'));
@@ -266,7 +323,7 @@
   function renderError(board, message, retry) {
     board.innerHTML = '';
     var box = el('div', 'vr-error');
-    box.appendChild(el('div', 'big', '🎬'));
+    box.appendChild(el('div', 'big', '片'));
     box.appendChild(el('div', 'h', '推荐暂不可用'));
     box.appendChild(el('div', 's', esc(message)));
     var btn = el('button', 'vr-retry', '重试');

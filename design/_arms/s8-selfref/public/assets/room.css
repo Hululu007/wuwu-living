@@ -1,0 +1,6 @@
+:root{--ink:#efe9dd;--paper:#f7f3ea;--ok:#4fb583;--warn:#cab549;--danger:#de4217}
+body{background:var(--paper);color:var(--ink)}
+.empty{border:1px dashed rgba(0,0,0,.2)}
+.empty.error{border-style:solid}
+.empty.unavailable{border-style:dotted}
+.loading{opacity:.6}

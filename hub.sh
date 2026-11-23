@@ -131,7 +131,10 @@ status() {
 import json,sys
 d=json.load(sys.stdin)
 for a in d['apps']:
-    s='在线' if a.get('running') else ('未打开' if a.get('kind')=='app' else '离线')
+    if a.get('id') == 'book':
+        s = '本地引擎'
+    else:
+        s='在线' if a.get('running') else ('未打开' if a.get('kind')=='app' else '离线')
     print('  %-6s %s' % (a['name'], s))
 " 2>/dev/null)
     if loaded; then echo "运行中（launchd 托管）  →  $URL"; else echo "运行中  →  $URL"; fi

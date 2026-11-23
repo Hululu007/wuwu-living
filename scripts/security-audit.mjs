@@ -259,7 +259,7 @@ async function commandInjection() {
 /* ───────────────────────── 5. 未鉴权写接口清单 ───────────────────────── */
 
 const writeInventory = [
-  { path: 'POST /api/book/ensure', effect: '启动/就绪书房 Reader Web', params: '无', exposure: '无鉴权；任意局域网可触发引擎启动（本机回环绑定）' },
+  { path: 'POST /api/book/ensure', effect: '只探测书房 Reader Web 健康状态（已去掉启动能力）', params: '无', exposure: '无鉴权；只读健康检查，不会启动 Reader.app（本机回环绑定）' },
   { path: 'POST /api/book/search-start', effect: '建后台搜书任务', params: '{q}', exposure: '无鉴权；可消耗 CPU/并发' },
   { path: 'POST /api/book/open', effect: '打开书籍详情/目录', params: '{bookUrl, bookSourceUrl, sources}', exposure: '无鉴权；服务端按书源 URL 抓取' },
   { path: 'POST /api/book/chapter', effect: '拉章节正文', params: '{bookUrl, ...}', exposure: '无鉴权；服务端抓取' },
@@ -267,7 +267,7 @@ const writeInventory = [
   { path: 'POST /api/start', effect: '启动指定子应用脚本', params: '{id}', exposure: '无鉴权；id 仅映射内置 apps 表，越界 400' },
   { path: 'POST /api/start-all', effect: '批量启动 book+web 子应用', params: '无', exposure: '无鉴权；会拉起 magnet/music/vod 脚本' },
   { path: 'POST /api/stop', effect: '停止指定子应用', params: '{id}', exposure: '无鉴权；可停止内置 web 子应用' },
-  { path: 'POST /api/reader/open', effect: 'macOS 打开 Reader.app', params: '无', exposure: '无鉴权；固定 bundle' },
+  { path: 'POST /api/reader/open', effect: '固定返回 403（客厅不再打开 Reader.app）', params: '无', exposure: '无鉴权；已封禁，不再触发任何启动' },
   { path: 'POST /api/download/add', effect: '新增直链/磁力下载任务', params: '{url|magnet,name}', exposure: '无鉴权；http(s)/magnet 方案校验，无内网黑名单；可落盘到下载目录' },
   { path: 'POST /api/download/pause', effect: '暂停任务', params: '{id}', exposure: '无鉴权；按任务 id' },
   { path: 'POST /api/download/resume', effect: '恢复任务', params: '{id}', exposure: '无鉴权' },

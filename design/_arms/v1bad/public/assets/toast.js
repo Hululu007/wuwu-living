@@ -1,0 +1,1 @@
+function toast(msg, err){var t=document.getElementById('toast');if(!t)return;t.textContent=msg;t.className='toast on'+(err?' err':'');if(err){t.onclick=function(){t.className='toast';t.onclick=null;};return;}setTimeout(function(){t.className='toast';},2400);}

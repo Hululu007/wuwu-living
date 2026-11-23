@@ -1,0 +1,12 @@
+:root{
+  --bg:#0a0d0b; --ink:#efe9dd; --muted:#c0b7a9; --faint:#9c9589;
+  --brass:#c4a36e; --ok:#7fbb8c; --warn:#f2c14e; --danger:#e05a4f;
+  --magnet:#7ea6e0; --book:#d6a05e; --music:#dd7768; --vod:#a996dd;
+  --download:#5fada8; --library:#9cac69; --notes:#c0b79c;
+  --calendar:#c489a9; --photos:#7fb4c4; --cast:#e0a46e;
+}
+.panel{font-size:14px;background:var(--bg);color:var(--ink);padding:12px;margin:16px;border-radius:2px;gap:8px}
+.empty{color:var(--faint);font-size:12.5px}
+.loading{color:var(--muted)}
+.error{color:var(--danger)}
+.list{border-radius:3px;padding:4px}

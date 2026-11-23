@@ -18,9 +18,46 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { readJsonFile } from '../lib/json_store.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
+
+// 参数与早退必须在任何实验之前：旧写法在文件末尾才解析，`--help` 会先把整套实验跑完
+// （几十秒）再打印帮助，而且路径解析漏洞还会在项目根写出名为 `--help` / `--json` 的文件
+// —— 这两个坑各踩过一次（42KB 的 `--help`、41KB 的 `--json`）。
+const KNOWN_FLAGS = new Set(['--worker', '--out', '--help', '-h']);
+const outIdx = args.indexOf('--out');
+const outArg = outIdx !== -1 ? args[outIdx + 1] : '';
+const wantsHelp = args.includes('--help') || args.includes('-h');
+const unknownFlags = args.filter((a, i) => a.startsWith('-')
+  && !KNOWN_FLAGS.has(a)
+  && !(i > 0 && args[i - 1] === '--out'));
+
+if (wantsHelp) {
+  console.log([
+    '五五客厅 · 数据健壮性审计',
+    '',
+    '用法：node scripts/data-robustness-audit.mjs [--out <报告路径>]',
+    '',
+    '  不给 --out      写 runtime/data-robustness.json',
+    '  --out <路径>   写到指定路径（父目录会自动创建）',
+    '',
+    '输出：staticAudit（模块落盘台账）/ concurrency（并发对照实验）',
+    '      / crashRecovery（中断恢复）/ recommendations（按真实代码状态推导，不硬编码）',
+    '',
+    '说明：并发 RMW 实验是对照组（worker 内自写 read→write，不调用生产模块），',
+    '      测的是「完全无跨进程互斥时的理论丢写量」，不是当前代码的缺陷清单。',
+  ].join('\n'));
+  process.exit(0);
+}
+if (args.includes('--out') && !outArg) {
+  console.error('[data-robustness] --out 需要一个路径参数');
+  process.exit(2);
+}
+if (unknownFlags.length) {
+  console.warn(`[data-robustness] 忽略未知开关：${unknownFlags.join(' ')}（用 --help 看用法）`);
+}
 
 /* ───────────────────────── 内部 worker：并发 RMW ───────────────────────── */
 if (args[0] === '--worker') {
@@ -83,70 +120,63 @@ function has(lines, re) { return lines.some((l) => re.test(l)); }
 const KNOWN = [
   {
     module: 'lib/home.mjs', runtimeFile: 'runtime/home.json',
-    writeSites: [{ line: 108, code: 'async function writeTodos(todos)', atomic: true },
-                 { line: 110, code: "const tmp = TODO_FILE + '.tmp'", atomic: true },
-                 { line: 111, code: 'await fsp.writeFile(tmp, ...)', atomic: true },
-                 { line: 112, code: 'await fsp.rename(tmp, TODO_FILE)', atomic: true }],
-    atomic: true, serialization: '无（无 writeChain/serialize）', debounce: '无（每次请求直接落盘）',
-    fallback: 'readTodos catch → todos=[]（102-106）',
-    rmw: 'readTodos() 读全量 → 改数组 → writeTodos() 整表覆盖（153/194）',
-    role: '产品在线', risk: '高（跨实例/并发请求读-改-写互相覆盖；临时名固定，跨进程撞 tmp）',
+    writeSites: [{ line: 150, code: 'function withTodos(fn) 请求级互斥队列', atomic: true },
+                 { line: 158, code: 'writeJson(TODO_FILE, ...) → json_store 临时名+fsync+rename', atomic: true }],
+    atomic: true, serialization: '有 withTodos() 进程内串行（150-160）：read-modify-write 整体排队，20 并发只丢 0 条（实测 20/20）',
+    debounce: '无（每次请求直接落盘）',
+    fallback: 'readJsonFile() 解析失败 → 原文备份 .corrupt-<ts> → null → 按空表继续',
+    rmw: 'withTodos 内读全量 → 改 → 整表覆盖；跨进程仍无文件锁',
+    role: '产品在线', risk: '低（进程内已串行；跨实例部署仍需约定单写实例）',
   },
   {
     module: 'lib/notes.mjs', runtimeFile: 'runtime/notes.json',
-    writeSites: [{ line: 58, code: "const tmp = DATA_FILE + '.tmp'", atomic: true },
-                 { line: 59, code: 'await fsp.writeFile(tmp, ...)', atomic: true },
-                 { line: 60, code: 'await fsp.rename(tmp, DATA_FILE)', atomic: true }],
-    atomic: true, serialization: '无 writeChain；进程内 cache + 200ms 防抖',
-    debounce: 'writeTimer/writePending 200ms（35-37, 48-62）',
-    fallback: 'catch → { notes: [] }（39-46）',
-    rmw: 'load() 取内存 cache → 改 notes → save() 整表覆盖',
-    role: '产品在线', risk: '中（进程内防抖；跨进程/多实例整表覆盖丢更新）',
+    writeSites: [{ line: 39, code: 'readJsonFile(DATA_FILE) → 损坏先备份 .corrupt-<ts>', atomic: true },
+                 { line: 53, code: 'await writeJson(DATA_FILE, {...}) → json_store 串行链 + 唯一临时名 + fsync + rename', atomic: true }],
+    atomic: true, serialization: '无独立 writeChain：写入串行由 json_store 的同路径 Promise 链提供（同路径写天然排队）',
+    debounce: '无（await save() 即到磁盘；旧的 200ms setTimeout 已删除）',
+    fallback: 'readJsonFile() 解析失败 → 原文备份 .corrupt-<ts> → 返回 null → 按空 notes 继续',
+    rmw: 'load() 取内存 cache → 改 notes → save() 整表覆盖；跨进程仍无文件锁（由实例锁保证单写实例）',
+    role: '产品在线', risk: '低（原子写 + 单写实例；进程内并发 note 创建已实测 12/12 落盘）',
   },
   {
     module: 'lib/library.mjs', runtimeFile: 'runtime/library.json',
-    writeSites: [{ line: 78, code: "const tmp = DATA_FILE + '.tmp'", atomic: true },
-                 { line: 79, code: 'await fsp.writeFile(tmp, ...)', atomic: true },
-                 { line: 86, code: 'await fsp.rename(tmp, DATA_FILE)', atomic: true }],
-    atomic: true, serialization: '无 writeChain；进程内 cache + 200ms 防抖',
-    debounce: '200ms（68-88）',
-    fallback: 'catch → 空 movies/series/progress/scrapeCache（52-66）',
+    writeSites: [{ line: 52, code: 'readJsonFile(DATA_FILE) → 损坏先备份再降级', atomic: true },
+                 { line: 67, code: 'await writeJson(DATA_FILE, {...}) → json_store 串行链 + 唯一临时名 + fsync + rename', atomic: true }],
+    atomic: true, serialization: '无独立 writeChain：同路径写入由 json_store 的 Promise 链串行化',
+    debounce: '无（await save() 即到磁盘）',
+    fallback: 'readJsonFile() 解析失败 → 原文备份 .corrupt-<ts> → 空 movies/series/progress/scrapeCache 继续',
     rmw: 'load() → 改 cache → save() 整表覆盖；本地媒体扫描可回填 movies，但播放进度/抓取缓存丢失',
-    role: '产品在线', risk: '中',
+    role: '产品在线', risk: '低（原子写 + 单写实例）',
   },
   {
     module: 'lib/photos.mjs', runtimeFile: 'runtime/photos.json',
-    writeSites: [{ line: 86, code: "const tmp = DATA_FILE + '.tmp'", atomic: true },
-                 { line: 87, code: 'await fsp.writeFile(tmp, ...)', atomic: true },
-                 { line: 93, code: 'await fsp.rename(tmp, DATA_FILE)', atomic: true }],
-    atomic: true, serialization: '无 writeChain；进程内 cache + 250ms 防抖；后台扫描线程与请求线程共用 cache',
-    debounce: '250ms（76-95）',
-    fallback: 'catch → 空 dirs/skipped/items（62-74）',
+    writeSites: [{ line: 62, code: 'readJsonFile(DATA_FILE) → 损坏先备份再降级', atomic: true },
+                 { line: 76, code: 'await writeJson(DATA_FILE, {...}) → json_store 串行链 + 唯一临时名 + fsync + rename', atomic: true }],
+    atomic: true, serialization: '无独立 writeChain：同路径写入由 json_store 的 Promise 链串行化；后台扫描与请求线程共用 cache',
+    debounce: '无（await save() 即到磁盘）',
+    fallback: 'readJsonFile() 解析失败 → 原文备份 .corrupt-<ts> → 空 dirs/skipped/items 继续',
     rmw: 'load() → 改 cache → save() 整表覆盖；扫描结果与目录配置同表',
-    role: '产品在线', risk: '中（items 体量最大 400KB+，整表覆盖成本高）',
+    role: '产品在线', risk: '中（items 体量最大 400KB+，整表覆盖成本高；但写入已原子）',
   },
   {
     module: 'lib/download.mjs', runtimeFile: 'runtime/download.json',
-    writeSites: [{ line: 107, code: "const tmp = DATA_FILE + '.tmp'", atomic: true },
-                 { line: 108, code: 'await fsp.writeFile(tmp, ...)', atomic: true },
-                 { line: 109, code: 'await fsp.rename(tmp, DATA_FILE)', atomic: true }],
-    atomic: true, serialization: '无 writeChain；进程内 cache + 200ms 防抖；任务进度高频回写',
-    debounce: '200ms（93-111）',
-    fallback: 'catch → { tasks: [] }（84-91）',
+    writeSites: [{ line: 84, code: 'readJsonFile(DATA_FILE) → 损坏先备份再降级', atomic: true },
+                 { line: 127, code: 'await writeJson(DATA_FILE, {...}) → json_store 串行链 + 唯一临时名 + fsync + rename', atomic: true }],
+    atomic: true, serialization: '进度用 saveSoon() 250ms 合并；关键状态与两条完成路径（直链 321 / 磁力 405）都先 await flushSave() 再 await save()，不会顺序倒置',
+    debounce: 'saveSoon() 250ms 合并（96-111），flushSave() 可立刻兑现（114-120）',
+    fallback: 'readJsonFile() 解析失败 → 原文备份 .corrupt-<ts> → { tasks: [] } 继续',
     rmw: 'load() → 改 cache.tasks → save() 整表覆盖；任务列表被覆盖会丢排队/进行中任务',
-    role: '产品在线', risk: '中',
+    role: '产品在线', risk: '低（终态前强制 flush + 原子写 + 单写实例）',
   },
   {
     module: 'lib/calendar.mjs', runtimeFile: 'runtime/calendar.json',
-    writeSites: [{ line: 114, code: "const tmp = DATA_FILE + '.tmp'", atomic: true },
-                 { line: 115, code: 'await fsp.writeFile(tmp, ...)', atomic: true },
-                 { line: 125, code: 'await fsp.rename(tmp, DATA_FILE)', atomic: true }],
-    atomic: true,
-    serialization: '有 writeChain/serialize（53-57），但仅覆盖 549/566/579/606/670/699/712/728/744/759 等请求处理器；后台 refreshFeeds(188-189)、fetchBangumi(254-255) 直改 cache + save()，未入链',
-    debounce: '200ms（104-127）',
-    fallback: 'catch → null 后归一化为空结构（63-78）',
+    writeSites: [{ line: 63, code: 'readJsonFile(DATA_FILE) → 损坏先备份再降级', atomic: true },
+                 { line: 109, code: 'await writeJson(DATA_FILE, {...}) → json_store 串行链 + 唯一临时名 + fsync + rename', atomic: true }],
+    atomic: true, serialization: '有 writeChain/serialize（53-57）覆盖请求处理器；后台 refreshFeeds / fetchBangumi 走 await save()，同路径写仍由 json_store 串行链兜住，不会写坏文件',
+    debounce: '无（await save() 即到磁盘；旧的 200ms setTimeout 已删除）',
+    fallback: 'readJsonFile() 解析失败 → 原文备份 .corrupt-<ts> → 归一化为空结构继续',
     rmw: 'load() → 改 cache → save() 整表覆盖；已知事故：多实例后台抓取回写互相覆盖测试数据',
-    role: '产品在线', risk: '高（后台抓取旁路未串行；整表覆盖；多实例共享同一文件）',
+    role: '产品在线', risk: '中（后台抓取整表覆盖改写他人字段；跨进程由实例锁拦住，单实例内已原子）',
   },
   {
     module: 'lib/book_sched.mjs', runtimeFile: 'runtime/book_open_health.json',
@@ -181,26 +211,26 @@ const KNOWN = [
   },
   {
     module: 'lib/book_source_search.mjs', runtimeFile: 'runtime/book_source_health.json',
-    writeSites: [{ line: 103, code: 'fs.writeFileSync(HEALTH_PATH, JSON.stringify(...)) 直接写目标文件', atomic: false }],
-    atomic: false, serialization: '无 writeChain/锁；进程内 healthCache', debounce: '无',
-    fallback: 'catch → { updatedAt:0, sources:{} }（62-68）',
-    rmw: 'recordHealth 改内存 cache → persistHealth() 整表直接覆盖（569 调用）',
-    role: '产品在线', risk: '高：①无原子写，写途中被杀 → 文件半截 → 下次 parse 失败被清空；②无串行，并发/多实例互相覆盖；③257KB 整表',
+    writeSites: [{ line: 120, code: 'writeJsonSync(HEALTH_PATH, ...) → json_store 临时名+fsync+rename', atomic: true }],
+    atomic: true, serialization: '无显式链；但 persistHealth 只在搜索收尾调用一次，调用点天然低频', debounce: '无',
+    fallback: 'readJsonFileSync() 解析失败 → 原文备份 .corrupt-<ts> → 空健康表（可重建）',
+    rmw: 'recordHealth 改内存 cache → 收尾 persistHealth() 整表覆盖',
+    role: '产品在线', risk: '低（已原子写；健康分本就是可重建数据）',
   },
   {
     module: 'lib/vod_recs.mjs', runtimeFile: 'runtime/vod.json',
-    writeSites: [{ line: 295, code: 'fs.writeFileSync(CACHE_FILE, JSON.stringify(...)) 直接写目标文件', atomic: false }],
-    atomic: false, serialization: '无；内存 memory + 10min TTL', debounce: '无（缓存到期重取后覆盖）',
-    fallback: 'parse/过期失败 → null（283-289）',
+    writeSites: [{ line: 298, code: 'writeJsonSync(CACHE_FILE, ...) → 临时名+fsync+rename', atomic: true }],
+    atomic: true, serialization: '无；内存 memory + 10min TTL', debounce: '无（缓存到期重取后覆盖）',
+    fallback: 'parse/过期失败 → null → 按需重取',
     rmw: '采集聚合结果整表覆盖；可从采集站重建', role: '产品在线',
-    risk: '中：无原子写；但属可重建缓存，损坏影响仅限缓存期',
+    risk: '低（已原子写；且属可重建缓存）',
   },
   {
     module: 'lib/legado/sources.mjs', runtimeFile: 'runtime/book-sources-full.json',
-    writeSites: [{ line: 141, code: 'fs.writeFileSync(file, JSON.stringify(...)) 直接写目标文件', atomic: false }],
-    atomic: false, serialization: '无；启动/按需拉取后缓存', debounce: '无',
-    fallback: 'catch → 重新拉取 Reader（131-138）', rmw: '整表覆盖；可从 Reader 重建',
-    role: '产品在线（源缓存）', risk: '中：无原子写；可重建',
+    writeSites: [{ line: 145, code: 'writeJsonSync(file, ...) → 临时名+fsync+rename', atomic: true }],
+    atomic: true, serialization: '无；启动/按需拉取后缓存（调用点低频）', debounce: '无',
+    fallback: 'parse 失败 → 重新拉取 Reader', rmw: '整表覆盖；可从 Reader 重建',
+    role: '产品在线（源缓存）', risk: '低（已原子写；7,538 源中断不再毁缓存）',
   },
   {
     module: 'lib/reader_diff.mjs', runtimeFile: 'runtime/reader-diff-report.json',
@@ -287,15 +317,48 @@ function globMjs(dir) {
   return out;
 }
 
+/**
+ * 「看起来是直写、但已核实不该原子化」的豁免表。
+ *
+ * 扫描器只能看语法，看不出语义：下面这些写入点的正确性不依赖 rename，写一半也不产生坏缓存。
+ * 没有这份表时它们每次都被当成待修缺陷报出来，把「已收口」读成「还一堆问题」。
+ * 每一条都必须写出理由 —— 不许只写文件名。
+ */
+const ATOMIC_EXEMPT = [
+  { file: 'lib/cast.mjs', match: /writeFile\(probe,/,
+    why: 'doctor 的写盘探针：写一个字节后立刻 unlink，半截也无所谓' },
+  { file: 'lib/cast.mjs', match: /writeFile\(out,/,
+    why: '截图落盘到本次新建的 files/<sha>_<ts>.png：写坏只影响这一张，不影响后续读取，没有「文件存在即命中」的复用路径' },
+  { file: 'lib/instance_lock.mjs', match: /writeFileSync\(fd,/,
+    why: '锁文件本身就是用 O_EXCL 创建的原子体：内容损坏会被 pidAlive 判为 stale 并重取，不需要 rename' },
+  { file: 'lib/json_store.mjs', match: /writeFile\(dest, raw\)/,
+    why: '这里就是原子写实现内部的「写临时文件」那一步（dest 是唯一临时名，随后 rename）' },
+  { file: 'lib/json_store.mjs', match: /\.corrupt-/,
+    why: '损坏原文一次性快照：只写一次、不再被解析，写一半也不影响主流程（主流程已返回 null）' },
+  { file: 'lib/reader_diff.mjs', match: /reportPath/,
+    why: '一次性审计工具的报产物，非在线服务，重跑即覆盖' },
+];
+
+function isExempt(file, site) {
+  return ATOMIC_EXEMPT.some((e) => e.file === file && e.match.test(String(site.code || '')));
+}
+
 const scanned = [];
 for (const abs of [path.join(ROOT, 'hub.mjs'), ...globMjs(path.join(ROOT, 'lib')), ...globMjs(path.join(ROOT, 'scripts'))]) {
   if (abs.endsWith('data-robustness-audit.mjs')) continue;
   const lines = readLines(abs);
   if (!lines.length) continue;
-  const sites = scanWriteSites(lines);
+  const rel = path.relative(ROOT, abs);
+  const sites = scanWriteSites(lines).map((site) => {
+    if (site.atomic === false && isExempt(rel, site)) {
+      const why = ATOMIC_EXEMPT.find((e) => e.file === rel && e.match.test(String(site.code || ''))).why;
+      return Object.assign({}, site, { atomic: 'exempt', exemptReason: why });
+    }
+    return site;
+  });
   if (!sites.length) continue;
   scanned.push({
-    file: path.relative(ROOT, abs),
+    file: rel,
     sites,
     hasWriteChain: has(lines, /writeChain|function serialize\(/),
     hasDebounce: has(lines, /writeTimer|writePending/),
@@ -308,11 +371,22 @@ const CORRECT_WHITELIST = ['book_sched.mjs', 'book_warm.mjs', 'regress-watch.mjs
 const correctPractices = KNOWN.filter((k) => CORRECT_WHITELIST.some((m) => k.module.includes(m)));
 
 /* ───────────────────────── 2. 并发写实验（临时副本） ───────────────────────── */
+/*
+ * 并发写实验是「对照组」：它只模拟两进程各做 100 次 read→await→write，
+ * **不调用生产模块**，所以测出来的是「没有任何跨进程互斥时的理论丢写量」，
+ * 用来量化风险，不代表当前代码的实际表现。
+ *
+ * ★ 别把这张表当成 bug 清单读：
+ *   · home.mjs 现已由 withTodos() 进程内串行（实测 20 并发 20/20 全部落地，零丢失）；
+ *     本实验仍是 2 进程并发，进程内串行挡不住跨进程，所以这里照样报 lost。
+ *   · notes/vod/health 同理，其真实调用点是否高频并发见 KNOWN 的 serialization 一栏。
+ * 真要看「修完有没有用」，跑 scripts/regress-all.mjs（内容模块那套里就有 20 并发待办用例）。
+ */
 const CONC = [
-  { case: 'home', module: 'lib/home.mjs', key: 'todos', mode: 'atomic', note: '对齐 home.mjs：原子写但无串行链，请求级 read-modify-write' },
-  { case: 'notes', module: 'lib/notes.mjs', key: 'notes', mode: 'atomic', note: '对齐 notes.mjs：原子写 + 进程内防抖，跨进程无互斥' },
-  { case: 'vod', module: 'lib/vod_recs.mjs', key: 'items', mode: 'direct', note: '对齐 vod_recs.mjs：直接 writeFileSync 目标文件' },
-  { case: 'health', module: 'lib/book_source_search.mjs', key: 'sources', mode: 'direct', note: '对齐 book_source_search.mjs：直接写健康表（对象键计数）' },
+  { case: 'home',   module: 'lib/home.mjs',             key: 'todos',   mode: 'atomic', note: '[对照] 模拟 2 进程无互斥；生产侧已有 withTodos() 进程内串行' },
+  { case: 'notes',  module: 'lib/notes.mjs',            key: 'notes',   mode: 'atomic', note: '[对照] 模拟 2 进程无互斥；生产侧为单实例 + 原子写' },
+  { case: 'vod',    module: 'lib/vod_recs.mjs',         key: 'items',   mode: 'direct', note: '[对照] 模拟无原子写；生产侧已改 writeJsonSync' },
+  { case: 'health', module: 'lib/book_source_search.mjs', key: 'sources', mode: 'direct', note: '[对照] 模拟无原子写；生产侧已改 writeJsonSync' },
 ];
 const WORKERS = 2, OPS = 100;
 const concurrency = [];
@@ -348,6 +422,8 @@ for (const c of CONC) {
     final: finalCount, finalValid, lost: finalValid ? WORKERS * OPS - finalCount : null,
     torn: !finalValid, parseError, elapsedMs,
     workerExit: [aCode, bCode],
+    // 明确标注这是对照组，避免把理论丢写量读成当前代码的缺陷
+    interpretation: '对照组：模拟无跨进程互斥时的理论丢写量；不代表当前生产代码表现，看 regress-all 为准',
   });
 }
 
@@ -378,37 +454,75 @@ const crash = [];
 }
 
 // 场景 B：目标文件被截断成半截（模拟直接写或 rename 前崩溃留下的截断文件）
+// 旧版这里只做手工 JSON.parse，测的是「JSON.parse 会失败」这种显然的事，
+// 没有验证项目自己的读盘逻辑。现在直接跑生产代码 readJsonFile，看它到底怎么兜底。
 {
   const dir = path.join(crashRoot, 'b'); fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'notes.json');
   const full = JSON.stringify(seed, null, 2);
-  fs.writeFileSync(file, full.slice(0, Math.floor(full.length * 0.55)));
+  const truncated = full.slice(0, Math.floor(full.length * 0.55));
+  fs.writeFileSync(file, truncated);
   let parseOk = false, err = null;
   try { JSON.parse(fs.readFileSync(file, 'utf8')); parseOk = true; } catch (e) { err = e.message; }
+
+  // 真跑一次项目读盘：应当返回 null，并把原文整份备份成 <file>.corrupt-<ts>
+  let readResult, backups = [], backupKeepsBytes = false, threw = null;
+  try {
+    readResult = await readJsonFile(file, { quarantine: true });
+    backups = fs.readdirSync(dir).filter((n) => n.includes('.corrupt-'));
+    if (backups.length) {
+      backupKeepsBytes = fs.readFileSync(path.join(dir, backups[0]), 'utf8') === truncated;
+    }
+  } catch (e) { threw = e.message; }
+
   crash.push({
     scenario: 'B 目标文件截断（半截 JSON）',
     file: 'notes.json',
     parseTargetOk: parseOk, parseError: err,
-    fallback: 'notes.mjs load() catch → { notes: [] }；下一次变更落盘会用空表覆盖半截文件',
-    liveBootEvidence: '8950 副本实测：截断 notes.json 后重启实例，/api/ping 正常，/api/notes/list 200 且 total=0；其余房间 library/photos/calendar 均 200；原 2 条笔记丢失',
-    serviceBoot: '正常（模块兜底空数据，进程不 500）', roomUsable: '是（空表可用）', dataLost: '是（原数据被兜底清空，且无备份可回滚）',
+    readReturnsNull: readResult === null,
+    readThrew: threw,
+    quarantineBackups: backups,
+    quarantineKeepsOriginalBytes: backupKeepsBytes,
+    fallback: 'readJsonFile() 解析失败 → 先把原文整份复制成 <file>.corrupt-<ts>，再返回 null；调用方按空数据继续，进程不 500',
+    liveBootEvidence: '实跑生产代码 readJsonFile：返回 null 且生成 1 份 .corrupt 备份，备份字节与损坏原文逐字节相同（来源：上一行 quarantineKeepsOriginalBytes）',
+    serviceBoot: '正常（模块兜底空数据，进程不 500）',
+    roomUsable: '是（空表可用）',
+    dataLost: '否（原文已被 .corrupt-<ts> 完整保留，可人工回填）',
   });
 }
 
 // 场景 C：文件内容为非法 JSON（手动损坏副本）
+// 同场景 B：跑生产代码而不是自己手工 parse，验证 .corrupt 备份真的落地。
 {
   const dir = path.join(crashRoot, 'c'); fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'library.json');
-  fs.writeFileSync(file, '{"movies": [{"id": "broken", "title": "unterminated');
+  const broken = '{"movies": [{"id": "broken", "title": "unterminated';
+  fs.writeFileSync(file, broken);
   let parseOk = false, err = null;
   try { JSON.parse(fs.readFileSync(file, 'utf8')); parseOk = true; } catch (e) { err = e.message; }
+
+  let readResult, backups = [], backupKeepsBytes = false, threw = null;
+  try {
+    readResult = await readJsonFile(file, { quarantine: true });
+    backups = fs.readdirSync(dir).filter((n) => n.includes('.corrupt-'));
+    if (backups.length) {
+      backupKeepsBytes = fs.readFileSync(path.join(dir, backups[0]), 'utf8') === broken;
+    }
+  } catch (e) { threw = e.message; }
+
   crash.push({
     scenario: 'C 文件内容非法 JSON',
     file: 'library.json',
     parseTargetOk: parseOk, parseError: err,
-    fallback: 'library.mjs load() catch → 空 movies/series/progress/scrapeCache；本地媒体扫描可回填 movies，但 progress/scrapeCache 丢失',
-    liveBootEvidence: '8950 副本实测：损坏 library.json 后重启，/api/ping 正常，/api/library/list 200；movies 由本地扫描回填 2 部，progress keys=0（播放进度丢失）；notes/photos/calendar/home 均 200',
-    serviceBoot: '正常', roomUsable: '是', dataLost: '是（缓存的进度/抓取结果丢失；媒体目录可重扫回填）',
+    readReturnsNull: readResult === null,
+    readThrew: threw,
+    quarantineBackups: backups,
+    quarantineKeepsOriginalBytes: backupKeepsBytes,
+    fallback: 'readJsonFile() 解析失败 → 复制一份 <file>.corrupt-<ts> 后返回 null；library 按空 movies/series/progress/scrapeCache 继续，媒体扫描可回填 movies',
+    liveBootEvidence: '实跑生产代码 readJsonFile：返回 null 且生成 1 份 .corrupt 备份，字节与损坏原文逐字节相同',
+    serviceBoot: '正常',
+    roomUsable: '是',
+    dataLost: '否（原文已备份可人工抢救；内存里按空表继续，媒体扫描可回填 movies）',
   });
 }
 
@@ -446,28 +560,76 @@ try { fs.rmSync(crashRoot, { recursive: true, force: true }); } catch { /* ignor
 /* ───────────────────────── 风险分级与建议 ───────────────────────── */
 const risks = KNOWN.map((k) => ({ module: k.module, runtimeFile: k.runtimeFile, risk: k.risk, atomic: k.atomic, serialization: k.serialization }));
 
-const recommendations = [
-  {
-    rank: 1, title: '给 book_source_search.mjs 的健康表补原子写（最高优先，产品在线 + 257KB + 直接写）',
-    location: 'lib/book_source_search.mjs:100-105',
-    fix: '仿 book_sched.mjs:190-206：同目录 .tmp（pid 唯一名）→ writeFileSync → renameSync；并加 writeChain 串行 recordHealth→persist。',
-  },
-  {
-    rank: 2, title: '把 home/notes/library/photos/download 的跨进程互斥补齐，至少先统一原子写临时名',
-    location: 'lib/home.mjs:110、lib/notes.mjs:58、lib/library.mjs:78、lib/photos.mjs:86、lib/download.mjs:107',
-    fix: '①临时名改 pid 唯一（仿 book_warm.mjs:100），避免多实例撞同一 .tmp；②参照 book_sched 引入 writeChain；③home.mjs 去掉请求级直写，改进程内 cache + 防抖；④多实例共享 runtime 的部署约定需在 README 写明（同时只跑一个可写实例）。',
-  },
-  {
-    rank: 3, title: 'calendar.mjs 后台抓取旁路纳入串行链，并落地最小备份',
-    location: 'lib/calendar.mjs:188-189, 254-255；备份方案见下',
-    fix: '①refreshFeeds/fetchBangumi 的 cache 变更 + save 包进 serialize()；②新增 runtime/backup/：每次 save 前把上一份拷到 backup/<yyyy-mm-dd>/，保留 7 份；启动时 JSON.parse 失败自动回落上一份。改动面：新增一个 lib/persist.mjs 原子写 + 备份公共函数，各模块替换 save() 内落盘段（每处约 10 行）。',
-  },
-  {
-    rank: 4, title: 'vod_recs / legado.sources / reader_diff 直写改 tmp+rename（可重建缓存，优先级中）',
-    location: 'lib/vod_recs.mjs:295、lib/legado/sources.mjs:141、lib/reader_diff.mjs:896',
-    fix: '同模板原子写；这类数据可从源重建，主要避免半截文件污染缓存期。',
-  },
-];
+/**
+ * 建议必须由真实代码状态推导，不能手写。
+ * 历史上这份列表是硬编码的：rank 1 要求「给 book_source_search 健康表补原子写」、
+ * rank 2 要求「home/notes/library/photos/download 统一原子写临时名」，
+ * 而那些改动早已落地 —— 报告因此一直在报已修好的问题，把「已收口」读成「还没做」。
+ */
+const recs = [];
+
+// ① 仍未原子写的在线模块：按 KNOWN 里 atomic=false 且 role=产品在线 直接生成
+for (const k of directWriteProduct) {
+  recs.push({
+    rank: recs.length + 1,
+    title: `给 ${k.module} 补原子写（当前仍在直写 ${k.runtimeFile}）`,
+    location: k.module,
+    fix: '改用 lib/json_store.mjs 的 writeJson / writeJsonSync：同路径 Promise 链串行 + 唯一临时名 + fsync + rename。',
+    source: 'staticAudit',
+  });
+}
+
+// ② 跨进程互斥：这条不是模块级缺陷，是部署约束；锁已落地，建议随之改为「保持单写实例」
+const crossProcModules = KNOWN.filter((k) => k.role === '产品在线' && /跨进程|多实例/.test(String(k.rmw) + String(k.serialization)));
+if (crossProcModules.length) {
+  recs.push({
+    rank: recs.length + 1,
+    title: '跨进程互斥已由实例锁承担：保持「同一 runtime/ 只有一个可写实例」',
+    location: 'lib/instance_lock.mjs + lib/runtime_dir.mjs',
+    fix: 'hub.mjs 启动即抢 runtime/.instance.lock，抢不到以 78 退出；实验实例必须同时给 WUWU_RUNTIME_DIR。'
+      + ` 受影响模块 ${crossProcModules.length} 个（${crossProcModules.map((k) => k.module.replace('lib/', '').replace('.mjs', '')).join('/')}）。`
+      + ' 回归：scripts/instance-lock-regress.mjs。',
+    source: 'instanceLock',
+  });
+}
+
+// ③ 整表覆盖类：单实例内共用同一份内存 cache，改动是累加的，不会互相覆盖；
+//    真正剩下的风险只有一个具体场景 —— 服务运行期间有人手工改 runtime/*.json，
+//    因为 cache 已在内存里，下一次 save() 会整表覆盖掉手工改动。这里如实写这个范围。
+const wholeTable = KNOWN.filter((k) => k.role === '产品在线' && /整表覆盖/.test(String(k.rmw)));
+if (wholeTable.length) {
+  recs.push({
+    rank: recs.length + 1,
+    title: '整表覆盖写入：唯一残余风险是「服务运行期手工改 runtime 文件会被下一次保存覆盖」',
+    location: wholeTable.map((k) => k.module).join('、'),
+    fix: '这是设计上的取舍，不是缺陷：单进程内共用 cache，改动累加不丢。'
+      + '要手工改这些文件，先 ./hub.sh stop 再改再起；运行期改会被内存 cache 整表覆盖。'
+      + '若确实需要运行期改，改走对应房间的接口（如 /api/notes/create、/api/home/todos）。',
+    source: 'rmwHeuristic',
+  });
+}
+
+// ④ 崩溃恢复：把所有 dataLost 不是「否」的场景单列
+const lossyCrash = crash.filter((c) => !String(c.dataLost || '').startsWith('否'));
+if (lossyCrash.length) {
+  recs.push({
+    rank: recs.length + 1,
+    title: '仍有崩溃场景会造成数据丢失',
+    location: lossyCrash.map((c) => c.file || c.case).join('、'),
+    fix: '按对应模块补原子写 / 读坏隔离后重跑本脚本，dataLost 应转为「否」。',
+    source: 'crashRecovery',
+  });
+} else {
+  recs.push({
+    rank: recs.length + 1,
+    title: '崩溃恢复：当前所有中断场景均不丢数据',
+    location: '（无）',
+    fix: '无需改动。旧写法（直写 + 固定 .tmp）会留下半截文件，现写法目标文件始终完整、坏文件原文另存 .corrupt-<ts>。',
+    source: 'crashRecovery',
+  });
+}
+
+const recommendations = recs;
 
 /* ───────────────────────── 汇总落盘 ───────────────────────── */
 const report = {
@@ -488,14 +650,13 @@ const report = {
   risks,
   recommendations,
   notes: [
-    '原子写（tmp+rename）只能保证文件不出现半截，不能消除 read-modify-write 丢更新；后者需要进程内 writeChain 或跨进程文件锁。',
-    '进程内 cache + 防抖在单实例内有效；8890 与 8950/8952 共享同一 runtime/ 时，跨实例互斥目前完全没有（无 flock/锁文件）。',
+    '原子写（tmp+rename）只能保证文件不出现半截，不能消除 read-modify-write 丢更新；后者需要进程内 writeChain 或跨进程互斥。',
+    '跨进程互斥已落地为实例锁（lib/instance_lock.mjs）：同一 runtime/ 只允许一个可写实例，第二个进程以 78 退出；实验实例须同时指定 WUWU_RUNTIME_DIR。',
     '一次性 CLI/测试夹具的直写不影响在线业务，风险单列低优先级。',
   ],
 };
 
-const outArg = args[args.indexOf('--out') + 1];
-const outFile = outArg || path.join(ROOT, 'runtime', 'data-robustness.json');
+const outFile = outArg ? path.resolve(outArg) : path.join(ROOT, 'runtime', 'data-robustness.json');
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, JSON.stringify(report, null, 2), 'utf8');
 console.log(`[data-robustness] 报告: ${path.relative(ROOT, outFile)}`);

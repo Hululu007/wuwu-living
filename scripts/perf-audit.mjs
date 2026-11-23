@@ -229,7 +229,7 @@ const BOOT_TRUTH = [
   { route: '/', file: '五五客厅.html', calls: [{ method: 'GET', path: '/api/home/summary', note: 'refresh() 进页即调，8s 轮询；todos 数据由 summary 下发' }] },
   { route: '/book/', file: '书房.html', calls: [
     { method: 'GET', path: '/api/book/info', note: 'build→loadInfo' },
-    { method: 'POST', path: '/api/book/ensure', note: 'build→wakeEngine，确保 Reader Web 就绪' },
+    { method: 'POST', path: '/api/book/ensure', note: '只读 readerHealth，不启动 Reader' },
     { method: 'GET', path: '/api/book/shelf', note: 'loadShelf，委托 Reader 1122 /reader3/getBookshelf' },
   ] },
   { route: '/library/', file: '媒体库.html', calls: [{ method: 'GET', path: '/api/library/list', note: 'load() 进页；30s 周期刷新；scan-status 仅扫描中轮询' }] },

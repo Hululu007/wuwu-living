@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/assets/toast.js"></script>
+<script src="/assets/notify-panel.js" data-ww-history="消息记录"></script>
+  <script src="/assets/fetch-timeout.js"></script>
 <script data-ww-embed-detect>(function(){try{var e=(window.top!==window)?'1':'0';}catch(_){e='1';}if(e==='1')document.documentElement.setAttribute('data-embedded','1');})();</script>
 <title>书房 · 五五客厅</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0c0e'/%3E%3Ctext x='32' y='44' font-size='30' font-family='serif' fill='%23d6a05e' text-anchor='middle'%3E55%3C/text%3E%3C/svg%3E">
@@ -11,23 +14,23 @@
   --bg:#0b0c0e;
   --panel:#101113;
   --panel2:#141518;
-  --ink:#efe9df;
-  --muted:#989186;
-  --faint:#625e56;
-  --line:rgba(239,233,223,.13);
-  --line2:rgba(239,233,223,.065);
-  --book:#d6a05e;
+  --ink:var(--ink);
+  --muted:#b1a99e;
+  --faint:#8e867b;
+  --line:rgba(239,233,223,.16);
+  --line2:rgba(239,233,223,.085);
+  --book:var(--book);
   --book-soft:rgba(214,160,94,.13);
   --book-edge:rgba(214,160,94,.36);
-  --ok:#87bf93;
-  --warn:#d7a15e;
-  --bad:#d98484;
+  --ok:var(--ok);
+  --warn:var(--warn);
+  --bad:var(--danger);
   --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
   --serif:"Songti SC","STSong","Noto Serif SC",serif;
   --read-size:19px;
   --read-bg:#101114;
   --read-ink:#e8e1d4;
-  --read-muted:#8e877b;
+  --read-muted:#9d9588;
   --read-line:rgba(239,233,223,.10);
 }
 *{box-sizing:border-box}
@@ -37,15 +40,15 @@ body{
   min-height:100vh;color:var(--ink);font:14px/1.65 var(--sans);
   -webkit-font-smoothing:antialiased;
   background:
-    radial-gradient(900px 500px at 6% -8%, rgba(214,160,94,.10), transparent 64%),
-    radial-gradient(760px 460px at 102% 108%, rgba(214,160,94,.045), transparent 66%),
+    radial-gradient(900px 500px at 6% -8%, rgba(202,181,73,.10), transparent 64%),
+    radial-gradient(760px 460px at 102% 108%, rgba(202,181,73,.045), transparent 66%),
     var(--bg);
 }
 a{color:inherit;text-decoration:none}
 button,input{font:inherit;color:inherit}
 button{background:none;border:0;padding:0;cursor:pointer}
 button:disabled{cursor:not-allowed;opacity:.35}
-::selection{background:rgba(214,160,94,.24)}
+::selection{background:rgba(202,181,73,.24)}
 [hidden]{display:none!important}
 
 .grain{
@@ -53,9 +56,10 @@ button:disabled{cursor:not-allowed;opacity:.35}
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
 }
 .page{position:relative;z-index:2;max-width:1760px;margin:0 auto;padding:24px 32px 56px;min-height:100vh;display:flex;flex-direction:column}
+.page::before{content:"";position:fixed;top:0;left:0;right:0;height:3px;z-index:6;background:linear-gradient(90deg,transparent 6%,rgba(202,181,73,.78) 42%,rgba(202,181,73,.78) 58%,transparent 94%);pointer-events:none}
 
 /* ── 顶栏 ── */
-.top{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line2)}
 .ww-home{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid rgba(255,255,255,.06);border-radius:8px;font-size:12px;letter-spacing:.1em;color:var(--muted,#8b8b8b);text-decoration:none;line-height:1;transition:color .15s,background .15s,border-color .15s;white-space:nowrap;flex:none}
 .ww-home:hover{color:var(--ink,#eae6df);background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12)}
 .ww-home svg{width:14px;height:14px;opacity:.8}
@@ -68,18 +72,15 @@ html[data-embedded] .ww-home{display:none}
   background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:9px;
 }
 .brand b{display:block;font-size:15px;font-weight:600;letter-spacing:.16em;line-height:1.2}
-.brand i{display:block;font-style:normal;font-size:10.5px;letter-spacing:.1em;color:var(--faint);margin-top:3px}
+.brand i{display:block;font-style:normal;font-size:11px;letter-spacing:.1em;color:var(--faint);margin-top:3px}
 .top-right{display:flex;align-items:center;gap:14px}
 .engine{
   display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);
-  white-space:nowrap;padding:6px 10px;border:1px solid transparent;border-radius:7px;
+  white-space:nowrap;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.025);
 }
-.engine:hover{border-color:var(--line2);background:rgba(255,255,255,.025)}
 .engine i{width:6px;height:6px;border-radius:50%;background:var(--faint)}
-.engine.on{color:#b6ac9d}
-.engine.on i{background:var(--ok);box-shadow:0 0 0 3px rgba(127,187,140,.12)}
-.engine.waking i{background:var(--warn);animation:pulse 1.2s infinite}
-@keyframes pulse{50%{opacity:.35}}
+.engine.on{color:#c3d4c6;border-color:rgba(79,181,131,.28);background:rgba(79,181,131,.07)}
+.engine.on i{background:var(--ok);box-shadow:0 0 0 3px rgba(79,181,131,.14)}
 
 /* ── 题头 ── */
 .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:44px;padding:42px 0 28px}
@@ -93,13 +94,13 @@ html[data-embedded] .ww-home{display:none}
   display:block;font-family:var(--serif);font-size:32px;font-weight:600;line-height:1;
   color:var(--book);font-variant-numeric:tabular-nums;letter-spacing:-.01em;
 }
-.stat span{display:block;margin-top:7px;font-size:10.5px;letter-spacing:.12em;color:var(--faint)}
+.stat span{display:block;margin-top:7px;font-size:11px;letter-spacing:.12em;color:var(--faint)}
 
 /* ── 主体 ── */
 .main{display:grid;grid-template-columns:292px minmax(0,1fr);gap:34px;align-items:start;flex:1}
 .side{display:flex;flex-direction:column;gap:14px;position:sticky;top:18px}
-.card{padding:18px 18px 16px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.032),rgba(255,255,255,.011))}
-.cap{font-size:10.5px;letter-spacing:.16em;color:var(--faint);margin-bottom:10px}
+.card{padding:18px 18px 16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.032),rgba(255,255,255,.011))}
+.cap{font-size:11px;letter-spacing:.16em;color:#8d8578;margin-bottom:10px}
 .cap .num{color:var(--book);letter-spacing:.04em}
 
 .search{display:flex;gap:8px;align-items:center}
@@ -112,52 +113,52 @@ html[data-embedded] .ww-home{display:none}
 .search input::placeholder{color:var(--faint)}
 .search input:focus{border-color:var(--book-edge);background:rgba(255,255,255,.04);box-shadow:0 0 0 3px rgba(214,160,94,.08)}
 .search button{
-  flex:0 0 auto;padding:10px 15px;border-radius:8px;background:var(--book);color:#15110c;
+  flex:0 0 auto;padding:10px 15px;border-radius:8px;background:var(--book);color:var(--on-accent);
   font-size:12.5px;font-weight:700;letter-spacing:.06em;transition:.18s;
 }
 .search button:hover{background:#e2ae6c}
 .search button:active{transform:translateY(1px)}
-.search-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;font-size:10.5px;color:var(--faint)}
+.search-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;font-size:11px;color:var(--faint)}
 .search-meta .clear{color:var(--muted);display:none}
 .search-meta .clear:hover{color:var(--book)}
 .search-meta .clear.on{display:inline}
 .suggest{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-.suggest button{font-size:10.5px;color:#a9a195;padding:4px 8px;border:1px solid var(--line2);border-radius:5px;background:rgba(255,255,255,.018)}
+.suggest button{font-size:11px;color:var(--muted);padding:4px 8px;border:1px solid var(--line2);border-radius:5px;background:rgba(255,255,255,.018)}
 .suggest button:hover{color:var(--book);border-color:var(--book-edge)}
 
 .shelf-list{display:flex;flex-direction:column;gap:2px}
 .shelf-item{display:flex;align-items:center;gap:10px;padding:8px 7px;border-radius:8px;text-align:left;transition:.14s;min-width:0}
 .shelf-item{cursor:pointer}
 .shelf-item:hover{background:rgba(255,255,255,.032)}
-.shelf-del{margin-left:auto;flex:0 0 auto;font-size:10.5px;color:#8b8378;padding:4px 7px;border:1px solid var(--line2);border-radius:5px;background:none}
-.shelf-del:hover{color:#d98b7a;border-color:rgba(217,139,122,.4)}
+.shelf-del{margin-left:auto;flex:0 0 auto;font-size:11px;color:#b4a99b;padding:4px 7px;border:1px solid var(--line2);border-radius:2px;background:none}
+.shelf-del:hover{color:var(--danger);border-color:rgba(222,66,23,.4);background:rgba(222,66,23,.07)}
 .shelf-del+.shelf-del{display:none}
 .shelf-item .cover{width:32px;height:44px;flex:0 0 auto}
 .shelf-item .cover span{font-size:12px}
 .shelf-item .meta{min-width:0;flex:1}
 .shelf-item .name{font-size:12.5px;color:#ddd5c8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.5}
-.shelf-item .sub{font-size:10.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
-.shelf-empty{padding:8px 2px 4px;font-size:11px;line-height:1.8;color:var(--faint)}
+.shelf-item .sub{font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.shelf-empty{padding:8px 2px 4px;font-size:11.5px;line-height:1.85;color:#948c7f}
 .recommend{margin:0 0 16px}
 .rec-head{display:flex;align-items:baseline;gap:10px;margin:2px 2px 9px}
 .rec-head b{font-size:13px;color:#ddd5c8;font-weight:500;letter-spacing:.02em}
-.rec-head span{font-size:10.5px;color:var(--faint)}
-.rec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:9px}
-.rec-card{display:flex;gap:9px;padding:9px;border:1px solid var(--line2);border-radius:9px;background:rgba(255,255,255,.018);cursor:pointer;text-align:left;transition:.15s;min-width:0}
+.rec-head span{font-size:11px;color:#8d8578}
+.rec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:11px}
+.rec-card{display:flex;gap:10px;padding:10px;border:1px solid var(--line2);border-radius:11px;background:rgba(255,255,255,.022);cursor:pointer;text-align:left;transition:.15s;min-width:0}
 .rec-card:hover{border-color:var(--book-edge);background:var(--book-soft);transform:translateY(-1px)}
-.rec-card .cover{width:46px;height:64px;flex:0 0 auto;border-radius:4px;overflow:hidden;background:#191a1d}
+.rec-card .cover{width:48px;height:66px;flex:0 0 auto;border-radius:4px;overflow:hidden;background:#191a1d}
 .rec-card .cover img{width:100%;height:100%;object-fit:cover;display:block}
 .rec-card .meta{min-width:0;display:flex;flex-direction:column;gap:2px;flex:1}
-.rec-card .name{font-size:12.5px;color:#e2dacd;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rec-card .by{font-size:10px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rec-card .desc{font-size:10.5px;color:#8f877b;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.rec-card .tag{margin-top:auto;font-size:9.5px;color:var(--book);opacity:.72}
+.rec-card .name{font-size:13.5px;color:#ece3d4;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec-card .by{font-size:11px;color:#a69e92;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec-card .desc{font-size:11px;color:#b2aa9e;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rec-card .tag{margin-top:auto;font-size:11px;color:var(--book);opacity:.9;letter-spacing:.02em}
 .rec-empty{padding:14px 2px;font-size:11px;color:var(--faint)}
-.source-card p{margin:0 0 10px;font-size:11px;line-height:1.8;color:var(--muted)}
+.source-card p{margin:0 0 10px;font-size:11.5px;line-height:1.8;color:#a49c8f}
 .source-card p b{color:var(--book);font-weight:500}
 .source-card button{
-  width:100%;padding:8px 10px;border:1px solid var(--line2);border-radius:7px;
-  font-size:11px;color:#b4aca0;transition:.16s;
+  width:100%;padding:9px 10px;border:1px solid var(--book-edge);border-radius:8px;
+  font-size:11.5px;color:var(--book);background:var(--book-soft);transition:.16s;
 }
 .source-card button:hover{border-color:var(--book-edge);color:var(--book);background:var(--book-soft)}
 
@@ -165,7 +166,7 @@ html[data-embedded] .ww-home{display:none}
 .stage{min-width:0}
 .view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:2px 2px 14px;border-bottom:1px solid var(--line2)}
 .view-head b{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:.03em}
-.view-head span{font-size:10.5px;color:var(--faint);letter-spacing:.03em}
+.view-head span{font-size:11px;color:var(--faint);letter-spacing:.03em}
 .results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
 .book-card{
   display:flex;align-items:center;gap:13px;padding:13px 13px;border:1px solid var(--line2);
@@ -175,13 +176,13 @@ html[data-embedded] .ww-home{display:none}
 .book-card .cover{width:48px;height:66px;flex:0 0 auto}
 .book-card .info{min-width:0;flex:1}
 .book-card .name{font-family:var(--serif);font-size:16px;line-height:1.4;color:#e5dccd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.book-card .author{font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.book-card .line{font-size:10.5px;color:var(--faint);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-card .author{font-size:11.5px;color:#b2aa9e;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.book-card .line{font-size:11px;color:#91897c;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .book-card .go{flex:0 0 auto;font-size:11px;color:var(--book);border:1px solid var(--book-edge);border-radius:5px;padding:4px 8px}
-.book-card .go:hover{background:var(--book);color:#15110c}
+.book-card .go:hover{background:var(--book);color:var(--on-accent)}
 .cover{
   position:relative;display:grid;place-items:center;overflow:hidden;border-radius:5px;
-  background:linear-gradient(135deg,#2a261e,#15130f);border:1px solid rgba(214,160,94,.24);
+  background:linear-gradient(135deg,#2a261e,#15130f);border:1px solid rgba(202,181,73,.24);
   box-shadow:0 4px 12px rgba(0,0,0,.22);
 }
 .cover span{font-family:var(--serif);font-weight:600;color:#d8c6a8;line-height:1}
@@ -194,8 +195,18 @@ html[data-embedded] .ww-home{display:none}
 }
 .empty-state h3{margin:0;font-family:var(--serif);font-size:21px;font-weight:500;letter-spacing:.04em}
 .empty-state p{margin:8px auto 0;max-width:360px;font-size:12px;line-height:1.9;color:var(--muted)}
+/* ★ 2026-11-22 加「不可用」变体（S4 第④类：书源等上游连不上）。
+   与空态区分不靠颜色单一维度：虚线→实线、边框加粗、标题左对齐。 */
+.empty-state.unavailable{
+  border-style:solid;border-width:1px 1px 1px 3px;
+  border-color:rgba(202,181,73,.5);border-left-color:rgba(202,181,73,.8);
+  background:rgba(202,181,73,.05);text-align:left;
+}
+.empty-state.unavailable h3{color:#e6d79a;font-size:17px}
+.empty-state.unavailable p{margin-left:0}
+.empty-state.unavailable .empty-mark{color:var(--warn)}
 .empty-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:16px}
-.empty-chips button{font-size:11px;color:#a9a195;padding:5px 9px;border:1px solid var(--line2);border-radius:5px}
+.empty-chips button{font-size:11px;color:var(--muted);padding:5px 9px;border:1px solid var(--line2);border-radius:5px}
 .empty-chips button:hover{color:var(--book);border-color:var(--book-edge)}
 .skeleton-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
 .skeleton-card{height:94px;border-radius:10px;background:linear-gradient(90deg,rgba(255,255,255,.035),rgba(255,255,255,.07),rgba(255,255,255,.035));background-size:200% 100%;animation:shimmer 1.3s infinite}
@@ -214,20 +225,20 @@ html[data-embedded] .ww-home{display:none}
 .reader-head .book-main .intro{margin:7px 0 0;font-size:11px;line-height:1.7;color:var(--faint);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .reader-actions{display:flex;gap:8px;align-items:center;flex:0 0 auto}
 .reader-actions button,.reader-actions a{
-  font-size:11px;color:#a9a195;padding:7px 10px;border:1px solid var(--line2);border-radius:6px;transition:.16s;white-space:nowrap;
+  font-size:11px;color:var(--muted);padding:7px 10px;border:1px solid var(--line2);border-radius:6px;transition:.16s;white-space:nowrap;
 }
 .reader-actions button:hover,.reader-actions a:hover{color:var(--book);border-color:var(--book-edge);background:var(--book-soft)}
 .reader-toolbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;padding:10px 2px;margin-top:4px;background:rgba(11,12,14,.88);backdrop-filter:blur(8px);border-bottom:1px solid var(--line2)}
 .reader-toolbar .chapnav{display:flex;gap:6px}
-.reader-toolbar .chapnav button{font-size:11px;color:#a9a195;padding:6px 9px;border:1px solid var(--line2);border-radius:5px}
+.reader-toolbar .chapnav button{font-size:11px;color:var(--muted);padding:6px 9px;border:1px solid var(--line2);border-radius:5px}
 .reader-toolbar .chapnav button:hover:not(:disabled){color:var(--book);border-color:var(--book-edge)}
-.reader-toolbar .pos{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums;margin-left:2px;white-space:nowrap}
+.reader-toolbar .pos{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;margin-left:2px;white-space:nowrap}
 .reader-toolbar .tools{display:flex;gap:5px;margin-left:auto;align-items:center}
-.reader-toolbar .tools button{font-size:10.5px;color:#a9a195;padding:5px 8px;border:1px solid var(--line2);border-radius:5px}
+.reader-toolbar .tools button{font-size:11px;color:var(--muted);padding:5px 8px;border:1px solid var(--line2);border-radius:5px}
 .reader-toolbar .tools button:hover{color:var(--book);border-color:var(--book-edge)}
 .widthctl{display:flex;align-items:center;gap:7px;white-space:nowrap}
 .widthctl input[type=range]{width:108px;accent-color:var(--book);cursor:pointer;margin:0}
-.widthctl .width-val{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums;min-width:86px}
+.widthctl .width-val{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;min-width:86px}
 .width-handle{position:absolute;top:0;right:0;bottom:0;width:16px;cursor:col-resize;display:flex;align-items:center;justify-content:center;z-index:5;touch-action:none;user-select:none;-webkit-user-select:none}
 .width-handle:before{content:"";position:absolute;top:14px;bottom:14px;width:1px;background:var(--read-line)}
 .width-handle .grip{position:relative;width:7px;height:26px;border-radius:4px;background:var(--read-muted);opacity:.5}
@@ -236,7 +247,7 @@ html[data-embedded] .ww-home{display:none}
 .reader-body{display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;align-items:start;margin-top:12px}
 .reader-body.toc-hidden{grid-template-columns:minmax(0,1fr)}
 .toc-panel{position:sticky;top:58px;border:1px solid var(--line2);border-radius:10px;background:rgba(255,255,255,.018);overflow:hidden}
-.toc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-bottom:1px solid var(--line2);font-size:10.5px;letter-spacing:.12em;color:var(--faint)}
+.toc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-bottom:1px solid var(--line2);font-size:11px;letter-spacing:.12em;color:var(--faint)}
 .toc-head .n{color:var(--book);letter-spacing:0}
 .toc-list{max-height:min(620px,calc(100vh - 230px));overflow:auto;padding:6px}
 .toc-list button{
@@ -245,19 +256,19 @@ html[data-embedded] .ww-home{display:none}
 }
 .toc-list button:hover{background:rgba(255,255,255,.035);color:#e2d8c8}
 .toc-list button.on{background:var(--book-soft);color:var(--book)}
-.toc-list button .idx{flex:0 0 24px;font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums;padding-top:2px}
+.toc-list button .idx{flex:0 0 24px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;padding-top:2px}
 .toc-list button.on .idx{color:var(--book)}
 .toc-list button .t{min-width:0;word-break:break-word}
 .toc-panel.hidden{display:none}
 .reading-wrap{border:1px solid var(--read-line);border-radius:12px;background:var(--read-bg);color:var(--read-ink);overflow:hidden;transition:background .2s,color .2s}
 .reading{padding:42px clamp(22px,5vw,64px) 40px;max-width:900px;margin:0 auto;position:relative}
-.chapter-kicker{font-size:10.5px;letter-spacing:.16em;color:var(--read-muted);margin-bottom:8px}
+.chapter-kicker{font-size:11px;letter-spacing:.16em;color:var(--read-muted);margin-bottom:8px}
 .chapter-title{font-family:var(--serif);font-size:clamp(25px,2.7vw,32px);font-weight:600;line-height:1.3;letter-spacing:.03em;margin:0 0 28px;color:var(--read-ink)}
 .chapter-content{font-family:var(--serif);font-size:var(--read-size);line-height:2.02;letter-spacing:.01em;color:var(--read-ink)}
 .chapter-content p{margin:0 0 1.05em;text-indent:2em;word-break:break-word}
 .chapter-content p:last-child{margin-bottom:0}
 .chapter-content .err{color:var(--bad);font-family:var(--sans);font-size:13px;line-height:1.8;text-indent:0}
-.chapter-end{display:flex;align-items:center;gap:12px;margin:36px 0 0;color:var(--read-muted);font-size:10.5px;letter-spacing:.14em}
+.chapter-end{display:flex;align-items:center;gap:12px;margin:36px 0 0;color:var(--read-muted);font-size:11px;letter-spacing:.14em}
 .chapter-end:before,.chapter-end:after{content:"";height:1px;flex:1;background:var(--read-line)}
 .chapter-nav{display:flex;justify-content:space-between;gap:12px;margin-top:22px}
 .chapter-nav button{font-size:11px;color:var(--read-muted);padding:7px 11px;border:1px solid var(--read-line);border-radius:6px}
@@ -276,7 +287,7 @@ html[data-embedded] .ww-home{display:none}
 /* ── 全屏沉浸阅读 ── */
 .full-exit{
   position:fixed;top:16px;right:18px;z-index:80;display:none;align-items:center;gap:6px;
-  font-size:11.5px;color:#a9a195;padding:8px 12px;border:1px solid var(--line2);border-radius:7px;
+  font-size:11.5px;color:var(--muted);padding:8px 12px;border:1px solid var(--line2);border-radius:7px;
   background:rgba(17,18,20,.86);backdrop-filter:blur(8px);white-space:nowrap;
 }
 .full-exit:hover{color:var(--book);border-color:var(--book-edge)}
@@ -302,18 +313,18 @@ body.reading-full .full-exit{display:inline-flex}
 .modal-search input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:7px;background:rgba(255,255,255,.03);font-size:12px;outline:none}
 .modal-search input:focus{border-color:var(--book-edge)}
 .group-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 14px}
-.group-chips button{font-size:10.5px;color:#aaa296;padding:5px 8px;border:1px solid var(--line2);border-radius:5px}
+.group-chips button{font-size:11px;color:#aaa296;padding:5px 8px;border:1px solid var(--line2);border-radius:5px}
 .group-chips button:hover{color:var(--book);border-color:var(--book-edge)}
 .source-list{display:flex;flex-direction:column;gap:2px}
 .source-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 7px;border-bottom:1px solid var(--line2);font-size:11.5px}
 .source-row .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d5ccbf}
-.source-row .g{flex:0 0 auto;font-size:10px;color:var(--faint)}
+.source-row .g{flex:0 0 auto;font-size:11px;color:var(--faint)}
 .modal-empty{padding:24px 0;text-align:center;font-size:11.5px;color:var(--faint)}
 
 /* ── 状态 ── */
 .loading{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(5,5,6,.58);backdrop-filter:blur(3px)}
 .loading .box{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 26px;border:1px solid var(--line);border-radius:12px;background:#111214}
-.spinner{width:24px;height:24px;border:2px solid rgba(214,160,94,.2);border-top-color:var(--book);border-radius:50%;animation:spin .8s linear infinite}
+.spinner{width:24px;height:24px;border:2px solid rgba(202,181,73,.2);border-top-color:var(--book);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading p{margin:0;font-size:11.5px;color:var(--muted)}
 .toast{
@@ -323,7 +334,8 @@ body.reading-full .full-exit{display:inline-flex}
   opacity:0;visibility:hidden;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.35);text-align:center;
 }
 .toast.on{opacity:1;visibility:visible;transform:translate(-50%,0)}
-.toast.bad{border-color:rgba(217,132,132,.4);color:#f0c0bb}
+/* .toast.bad 已删（2026-11-22）：normalize() 把 'bad' 归一成 'err'，该类永不命中；
+   且此处用的 rgba(217,132,132) 是旧 danger 色，即使生效也不同源。 */
 
 /* ── 响应式 ── */
 @media(max-width:1040px){
@@ -347,7 +359,7 @@ body.reading-full .full-exit{display:inline-flex}
 @media(max-width:620px){
   .page{padding:16px 15px 40px}
   .top-right{gap:8px}
-  .engine{font-size:10.5px;padding:5px 6px}
+  .engine{font-size:11px;padding:5px 6px}
   .hero h1{font-size:38px}
   .hero .sub{font-size:12px}
   .stats{gap:20px;flex-wrap:wrap}
@@ -355,6 +367,13 @@ body.reading-full .full-exit{display:inline-flex}
   .side{grid-template-columns:minmax(0,1fr)}
   .card.search-card{grid-column:auto}
   .results,.skeleton-grid{grid-template-columns:minmax(0,1fr)}
+  .rec-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .rec-card{padding:8px;gap:8px;border-radius:9px}
+  .rec-card .cover{width:40px;height:56px}
+  .rec-card .name{font-size:12px}
+  .rec-card .by{font-size:11px}
+  .rec-card .desc{display:none}
+  .rec-card .tag{font-size:11px;letter-spacing:0}
   .reader-head{gap:11px;padding:12px;align-items:flex-start;flex-wrap:wrap}
   .reader-head .book-cover{width:48px;height:66px}
   .reader-head .book-main .name{font-size:22px}
@@ -367,6 +386,233 @@ body.reading-full .full-exit{display:inline-flex}
   .modal{padding:10px}
   .modal-card{max-height:90vh}
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   五五客厅 · 书房统一皮肤（最后覆盖）
+   暖黑 / 象牙 / 黄铜；与放映室、音乐房共用一套尺寸与线
+   ═══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:var(--bg);
+  --panel:#101512;
+  --panel2:#151b16;
+  --ink:var(--ink);
+  --muted:#b8b0a2;
+  --faint:#8f887c;
+  --line:rgba(239,233,221,.16);
+  --line2:rgba(239,233,221,.085);
+  --book:var(--brass);
+  --book-soft:rgba(196,163,110,.12);
+  --book-edge:rgba(196,163,110,.36);
+  /* ★ 2026-11-23：书房**不引 room.css**，所以 room.css 里新加的 token 在这里不存在。
+     var(--on-accent) 解析失败会直接丢颜色（按钮文字变透明/继承），必须本地补定义。
+     值来源：--on-accent=原 #15110c（对 --book 对比 8.1）；--sunken=原 #0c100d。 */
+  --on-accent:#15110c;
+  --sunken:#0c100d;
+  --ok:var(--ok);
+  --warn:var(--warn);
+  --bad:var(--danger);
+  --serif:"Songti SC","STSong","Noto Serif SC",serif;
+}
+html{background:var(--bg)}
+body{
+  background:
+    radial-gradient(760px 430px at 5% -10%, rgba(196,163,110,.055), transparent 64%),
+    var(--bg);
+  font-size:14px;
+}
+.grain{display:none}
+.page{max-width:1760px;padding:0 32px 56px}
+.page::before{display:none}
+
+/* 顶栏：和放映室一致的单一房名栏 */
+.top{
+  min-height:58px;height:58px;padding:0;
+  border-bottom:1px solid var(--line2);
+  justify-content:flex-start;gap:14px;
+}
+.ww-home{
+  height:29px;padding:0 10px;gap:5px;
+  border:1px solid var(--line);border-radius:2px;
+  color:var(--muted);font-size:11px;letter-spacing:.08em;
+}
+.ww-home:hover{color:var(--ink);background:rgba(239,233,221,.035);border-color:rgba(239,233,221,.28)}
+.ww-home svg{width:14px;height:14px;opacity:.8}
+.top-sep{width:1px;height:22px;background:var(--line2);flex:none}
+.brand{display:flex;align-items:center;gap:12px;flex:1;min-width:0}
+.brand .seal{display:none}
+.brand b{font-family:var(--serif);font-size:25px;letter-spacing:.10em;line-height:1;color:var(--ink)}
+.brand i{font-size:11px;letter-spacing:.22em;color:var(--faint);margin-top:0}
+.top-right{gap:12px}
+.engine{
+  border:1px solid var(--line);border-radius:2px;
+  background:transparent;padding:6px 9px;font-size:11px;color:var(--muted);
+}
+.engine i{width:5px;height:5px}
+.engine.on{color:#b8cbb8;border-color:rgba(143,174,122,.30);background:rgba(143,174,122,.06)}
+.engine.on i{box-shadow:none}
+
+/* 题头 */
+.hero{width:100%;max-width:1180px;margin:0 auto;padding:34px 0 26px;gap:34px;align-items:flex-end}
+.hero-main{min-width:0}
+.hero-kick{font-size:11px;letter-spacing:.24em;color:var(--faint);margin-bottom:14px}
+.hero h1{font-size:clamp(48px,5.6vw,74px);line-height:1.02;letter-spacing:.01em;color:var(--ink)}
+.hero h1 span{color:var(--book);font-size:.62em}
+.hero .sub{max-width:520px;margin-top:13px;font-size:12.5px;line-height:1.95;color:var(--muted)}
+.hero .sub em{color:#c9bda9}
+.stats{gap:27px;padding-bottom:4px}
+.stat b{font-size:30px;color:var(--book)}
+.stat span{margin-top:6px;font-size:11px;letter-spacing:.10em;color:var(--faint)}
+
+/* 主体 */
+.main{width:100%;max-width:1180px;margin:0 auto;grid-template-columns:280px minmax(0,1fr);gap:28px;flex:1}
+.side{gap:12px;top:76px}
+.card{
+  padding:17px;border:1px solid var(--line2);border-radius:2px;
+  background:var(--panel);
+  background-image:none;
+}
+.cap{font-size:11px;letter-spacing:.16em;color:var(--faint);margin-bottom:10px}
+.cap .num{color:var(--book)}
+.search{gap:7px}
+.search input{
+  height:40px;padding:0 12px 0 33px;border-radius:2px;
+  background:var(--sunken);border:1px solid var(--line);font-size:13px;
+}
+.search input:focus{border-color:var(--book-edge);background:var(--sunken);box-shadow:0 0 0 3px rgba(196,163,110,.06)}
+.search button{
+  height:40px;padding:0 14px;border-radius:2px;background:var(--book);color:var(--on-accent);
+  font-size:12.5px;font-weight:600;letter-spacing:.04em;
+}
+.search button:hover{background:#d3b47d}
+.search-meta{font-size:11px;color:var(--faint);margin-top:8px}
+.suggest{gap:5px;margin-top:10px}
+.suggest button{
+  border-radius:2px;border:1px solid var(--line2);background:transparent;
+  color:var(--muted);font-size:11px;padding:4px 8px;
+}
+.suggest button:hover{color:var(--book);border-color:var(--book-edge)}
+.shelf-list{gap:1px}
+.shelf-item{border-radius:0;padding:8px 6px}
+.shelf-item:hover{background:rgba(239,233,221,.03)}
+.shelf-del{border-radius:2px;border:1px solid var(--line2)}
+.shelf-empty{font-size:11.5px;color:var(--faint)}
+.recommend{margin-bottom:16px}
+.rec-head{margin-bottom:10px}
+.rec-head b{font-size:13px;color:var(--ink)}
+.rec-head span{font-size:11px;color:var(--faint)}
+.rec-grid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.rec-card{
+  border:1px solid var(--line2);border-radius:2px;background:rgba(255,255,255,.018);
+  padding:10px;gap:10px;transform:none;
+}
+.rec-card:hover{border-color:var(--book-edge);background:rgba(196,163,110,.055);transform:none}
+.rec-card .cover{border-radius:2px;background:#151b16;border:1px solid var(--line2);box-shadow:none}
+.rec-card .name{font-size:13.5px;color:var(--ink)}
+.rec-card .by{font-size:11px;color:var(--muted)}
+.rec-card .desc{font-size:11px;color:var(--muted);line-height:1.6}
+.rec-card .tag{font-size:11px;color:var(--book)}
+.source-card p{font-size:11.5px;color:var(--muted)}
+.source-card button{border-radius:2px;border:1px solid var(--book-edge);background:var(--book-soft);color:var(--book);font-size:11.5px}
+
+/* 主视图 */
+.stage{min-width:0}
+.view-head{padding:0 0 13px;border-bottom:1px solid var(--line2)}
+.view-head b{font-size:26px;color:var(--ink)}
+.view-head span{font-size:11px;color:var(--faint)}
+.results{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+.book-card{
+  border:1px solid var(--line2);border-radius:2px;background:var(--panel);
+  padding:12px;gap:12px;transform:none;
+}
+.book-card:hover{border-color:var(--book-edge);background:#121813;transform:none}
+.book-card .cover{width:46px;height:64px;border-radius:2px;box-shadow:none}
+.book-card .name{font-size:16px;color:var(--ink)}
+.book-card .author{font-size:11.5px;color:var(--muted)}
+.book-card .line{font-size:11px;color:var(--faint)}
+.book-card .go{border-radius:2px;font-size:11px;padding:4px 7px}
+.cover{border-radius:2px;background:linear-gradient(135deg,#25231e,#15130f);border:1px solid rgba(196,163,110,.24);box-shadow:none}
+.empty-state{border-radius:2px;margin-top:14px;border:1px dashed var(--line2)}
+.empty-mark{border-radius:2px}
+.skeleton-card{border-radius:2px;background:linear-gradient(90deg,rgba(239,233,221,.04),rgba(239,233,221,.08),rgba(239,233,221,.04));background-size:200% 100%}
+
+/* 阅读器 */
+.reader-head{border-radius:2px;background:var(--panel);border:1px solid var(--line2);padding:16px}
+.reader-head .book-cover{width:60px;height:84px;border-radius:2px}
+.reader-head .book-main .name{font-size:26px;color:var(--ink)}
+.reader-head .book-main .byline{font-size:11px;color:var(--muted)}
+.reader-head .book-main .byline .src{color:var(--book)}
+.reader-head .book-main .intro{color:var(--faint)}
+.reader-actions button,.reader-actions a{border-radius:2px;border:1px solid var(--line2);font-size:11px;padding:6px 9px}
+.reader-actions button:hover,.reader-actions a:hover{color:var(--book);border-color:var(--book-edge);background:var(--book-soft)}
+.reader-toolbar{background:rgba(10,13,11,.9);border-bottom:1px solid var(--line2)}
+.reader-toolbar .chapnav button,.reader-toolbar .tools button{border-radius:2px;border:1px solid var(--line2)}
+.toc-panel{background:var(--panel);border:1px solid var(--line2);border-radius:2px}
+.reading{background:var(--read-bg);border-radius:0}
+.modal-card{border-radius:2px;background:var(--panel);border:1px solid var(--line)}
+.modal-search input{border-radius:2px;background:var(--sunken)}
+.group-chips button{border-radius:2px}
+.loading .box{border-radius:2px;background:var(--panel)}
+.toast{border-radius:2px;background:#1a211a;color:var(--ink);border:1px solid var(--line)}
+.full-exit{border-radius:2px}
+body.is-reading .hero,
+body.is-reading .side{display:none!important}
+body.is-reading .main{display:block;max-width:1180px;padding-top:24px}
+body.is-reading .stage,
+body.is-reading .reader{width:100%}
+html[data-embedded] .top{display:none!important}
+html[data-embedded] .page{padding-top:0}
+body.is-searching .hero{display:none!important}
+body.is-searching .main{padding-top:26px}
+
+@media(max-width:1040px){
+  .main{gap:24px;grid-template-columns:252px minmax(0,1fr)}
+  .hero{gap:26px}
+  .stats{gap:22px}
+}
+@media(max-width:900px){
+  .page{padding:0 22px 46px}
+  body.is-searching .main{padding-top:18px}
+  body.is-reading .main{padding-top:16px}
+  .hero{padding:28px 0 22px;align-items:flex-start;flex-direction:column;gap:20px}
+  .main{grid-template-columns:minmax(0,1fr);gap:18px}
+  .side{position:static;top:auto;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);align-items:start;gap:12px}
+  .card.search-card{grid-column:1/-1}
+}
+@media(max-width:620px){
+  .page{padding:0 15px 40px}
+  body.is-searching .main{padding-top:14px}
+  body.is-reading .main{padding-top:12px}
+  .top{height:56px;min-height:56px;gap:9px}
+  .top-sep{display:none}
+  .ww-home{height:27px;font-size:11px;padding:0 8px}
+  .brand b{font-size:21px;letter-spacing:.08em}
+  .brand i{font-size:11px;letter-spacing:.16em}
+  .top-right{gap:8px}
+  .engine{font-size:11px;padding:5px 6px}
+  .hero{padding:26px 0 20px;gap:16px}
+  .hero-kick{font-size:11px;letter-spacing:.18em;margin-bottom:11px}
+  .hero h1{font-size:44px}
+  .hero .sub{font-size:11.5px;line-height:1.85}
+  .stats{gap:19px;flex-wrap:wrap}
+  .stat b{font-size:26px}
+  .stat span{font-size:11px}
+  .side{grid-template-columns:minmax(0,1fr)}
+  .rec-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .rec-card{padding:8px;gap:8px;border-radius:2px}
+  .rec-card .cover{width:40px;height:56px}
+  .rec-card .name{font-size:12px}
+  .rec-card .desc{display:none}
+  .view-head b{font-size:24px}
+  .reader-head{gap:11px;padding:12px}
+  .reader-actions{width:100%;justify-content:flex-end}
+  .reader-toolbar{flex-wrap:wrap;gap:8px}
+  .reader-toolbar .widthctl{display:none}
+  .reader-toolbar .tools{width:100%;margin-left:0;justify-content:flex-end;flex-wrap:wrap}
+  .reader-toolbar .tools button{white-space:nowrap}
+  .reading{padding:28px 18px 30px}
+  .chapter-content{font-size:17px;line-height:1.95}
+}
+
 </style>
 </head>
 <body>
@@ -374,20 +620,21 @@ body.reading-full .full-exit{display:inline-flex}
 
 <div class="page">
   <header class="top">
-    <a class="ww-home" href="/" title="返回五五客厅" aria-label="返回五五客厅" id="wwHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
-    <div class="brand" aria-label="五五客厅">
-      <span class="seal">55</span>
-      <span><b>五五客厅</b><i>书房 · 直接读</i></span>
+    <a class="ww-home" href="/" title="返回五五客厅" aria-label="回客厅" id="wwHome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M15 6l-6 6 6 6"/></svg><span>回客厅</span></a>
+    <span class="top-sep" aria-hidden="true"></span>
+    <div class="brand" aria-label="书房">
+      <b>书房</b><i>STUDY / READING ROOM</i>
     </div>
     <div class="top-right">
-      <button class="engine" id="engine" type="button" title="检查阅读引擎">
-        <i></i><span id="engineText">检查引擎</span>
-      </button>
+      <span class="engine" id="engine" title="书房用本地多源引擎">
+        <i></i><span id="engineText">本地引擎</span>
+      </span>
     </div>
   </header>
 
   <section class="hero">
-    <div>
+    <div class="hero-main">
+      <div class="hero-kick">FIVE FIVE · READING ROOM</div>
       <h1>书房<span>。</span></h1>
       <p class="sub">搜一本书，就在这里读。<em>书源在后台跑，目录和正文都不离开这间房。</em></p>
     </div>
@@ -424,13 +671,13 @@ body.reading-full .full-exit{display:inline-flex}
       <div class="card">
         <div class="cap">在读书架 <span class="num" id="shelfCount"></span></div>
         <div class="shelf-list" id="shelfList">
-          <div class="shelf-empty">书架是空的。<br>搜一本书，读的时候点「加入书架」。</div>
+          <div class="shelf-empty">书架是空的。<br>搜一本书，读的时候点「加入书架」；收进书架后可随时移出。</div>
         </div>
       </div>
 
       <div class="card source-card">
         <div class="cap">书源库</div>
-        <p><b id="sourceTotal">—</b> 条书源 / <b id="groupTotal">—</b> 组<br>其中 <b id="searchableTotal">—</b> 条可直连 / <b id="searchRulesTotal">—</b> 条有搜索规则<br>由 Reader 引擎执行规则，书房只负责搜和读。</p>
+        <p><b id="sourceTotal">—</b> 条书源 / <b id="groupTotal">—</b> 组<br>其中 <b id="searchableTotal">—</b> 条可直连 / <b id="searchRulesTotal">—</b> 条有搜索规则<br>规则来自本地书源库，本地引擎执行。</p>
         <button type="button" id="openSources">浏览书源</button>
       </div>
     </aside>
@@ -558,7 +805,6 @@ body.reading-full .full-exit{display:inline-flex}
     theme: localStorage.getItem('wuwu.reader.theme') || 'night',
     tocOpen: true,
     busy: false,
-    waking: false,
     currentQuery: '',
     searchJob: '',
     searchSeq: 0,
@@ -581,20 +827,27 @@ body.reading-full .full-exit{display:inline-flex}
     });
   }
 
-  function toast(msg, bad) {
-    var el = $('toast');
-    el.textContent = msg;
-    el.classList.toggle('bad', !!bad);
-    el.classList.add('on');
-    clearTimeout(toast._t);
-    toast._t = setTimeout(function () { el.classList.remove('on'); }, 3200);
-  }
 
   function showLoading(text) {
     $('loadingText').textContent = text || '正在打开书…';
     $('loading').hidden = false;
   }
   function hideLoading() { $('loading').hidden = true; }
+
+  /* ★ 2026-11-22 补页内错误呈现（S1）：
+     原来打开失败只弹一条 toast，正文区继续停在骨架屏上 ——
+     用户看到的是「一直在加载」，而实际已经失败了。
+     把「出错」显示成「加载中」比没有错误态更误导。 */
+  function showChapterError(msg, retryFn) {
+    var box = $('chapterContent');
+    if (!box) return;
+    box.innerHTML = '<div class="empty error"><b>这一章没打开</b><span>' + esc(msg || '不知道什么原因') +
+      '</span><span class="act"><button class="btn sm ghost" type="button" id="chapterRetry">重试</button></span></div>';
+    var btn = $('chapterRetry');
+    if (btn && typeof retryFn === 'function') btn.onclick = retryFn;
+    var t = $('chapterTitle'); if (t) t.textContent = '没打开';
+    var k = $('chapterKicker'); if (k) k.textContent = '出错';
+  }
 
   function hueOf(s) {
     var h = 0;
@@ -623,7 +876,7 @@ body.reading-full .full-exit{display:inline-flex}
   }
 
   function apiGet(path) {
-    return fetch(path, { cache: 'no-store' }).then(function (r) {
+    return wwFetch(path, { cache: 'no-store' }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (d) {
         d.ok = r.ok && d.ok !== false;
         return d;
@@ -632,7 +885,7 @@ body.reading-full .full-exit{display:inline-flex}
   }
 
   function apiPost(path, body) {
-    return fetch(path, {
+    return wwFetch(path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body || {})
@@ -648,77 +901,83 @@ body.reading-full .full-exit{display:inline-flex}
   function paintEngine() {
     var el = $('engine');
     var text = $('engineText');
-    var i = S.info || {};
-    el.classList.remove('on', 'waking');
-    if (!i.installed) {
-      text.textContent = 'Reader 未安装';
-      return;
-    }
-    if (S.waking) {
-      el.classList.add('waking');
-      text.textContent = '引擎唤醒中';
-      return;
-    }
-    if (i.webRunning) {
-      el.classList.add('on');
-      text.textContent = 'Reader 引擎';
-    } else {
-      text.textContent = '引擎未启动';
-    }
+    // 2026-11-20：书房只用本地多源引擎，不再判断/显示 Reader 状态
+    el.classList.add('on');
+    text.textContent = '本地引擎';
   }
 
   function paintStats() {
     var i = S.info || {};
-    $('statSources').textContent = i.sources == null ? '—' : Number(i.sources).toLocaleString();
-    $('statGroups').textContent = i.groupTotal == null ? '—' : Number(i.groupTotal).toLocaleString();
+    // ★ 2026-11-22 修：后端改 stale-while-revalidate 之后，首次请求会返回
+    //   { pending:true, sources:null }（后台正在查 28MB 书库）。
+    //   原来一律显示「—」，用户会读成「一个书源都没有」，是假的「空」。
+    //   现在区分三种：取到了 / 正在取 / 确实没有。
+    var BLANK = i.pending ? '获取中…' : (i.stale ? '刷新中…' : '0');
+    function num(v) {
+      if (v != null) return Number(v).toLocaleString();
+      return BLANK;
+    }
+    $('statSources').textContent = num(i.sources);
+    $('statGroups').textContent = num(i.groupTotal);
     $('statShelf').textContent = String(S.shelf.length);
-    $('sourceTotal').textContent = i.sources == null ? '—' : Number(i.sources).toLocaleString();
-    $('groupTotal').textContent = i.groupTotal == null ? '—' : Number(i.groupTotal).toLocaleString();
-    $('searchableTotal').textContent = i.searchable == null ? '—' : Number(i.searchable).toLocaleString();
-    $('searchRulesTotal').textContent = i.searchRules == null ? '—' : Number(i.searchRules).toLocaleString();
-    $('shelfCount').textContent = S.shelf.length ? S.shelf.length + ' 本' : '';
+    $('sourceTotal').textContent = num(i.sources);
+    $('groupTotal').textContent = num(i.groupTotal);
+    $('searchableTotal').textContent = num(i.searchable);
+    $('searchRulesTotal').textContent = num(i.searchRules);
+    // ★ 2026-11-22 修：书架只渲染前 20 本（renderShelf 里 slice(0,20)），
+    //   但计数只写「N 本」，用户看不出后面还有没有 —— 属信息欺骗。
+    //   超过 20 时如实说「共 N 本，显示前 20」。
+    var SHELF_PAGE = 20;
+    $('shelfCount').textContent = !S.shelf.length
+      ? ''
+      : (S.shelf.length > SHELF_PAGE
+          ? '共 ' + S.shelf.length + ' 本 · 显示前 ' + SHELF_PAGE
+          : S.shelf.length + ' 本');
   }
 
   function loadInfo(silent) {
     return apiGet('/api/book/info').then(function (d) {
-      if (!d.ok) { if (!silent) toast(d.message || '书房没连上', true); return; }
+      if (!d.ok) { if (!silent) toast(d.message || '书房没连上', 'err'); return; }
       S.info = d;
       paintEngine();
       paintStats();
-      if (!d.webRunning) wakeEngine();
-    }).catch(function () { if (!silent) toast('书房没连上', true); });
-  }
-
-  function wakeEngine() {
-    if (S.waking) return;
-    if (S.info && !S.info.installed) return;
-    S.waking = true;
-    paintEngine();
-    apiPost('/api/book/ensure', {}).then(function (d) {
-      S.waking = false;
-      if (d.ok) {
-        toast('阅读引擎已就绪');
-        return loadInfo(true).then(loadShelf);
+      // 刚重启时 DB 扫描偶尔一次拿不到数（sources=0），12 秒缓存过期后再补一次
+      if (!d.sources && !loadInfo._retry) {
+        loadInfo._retry = true;
+        setTimeout(function () { loadInfo._retry = false; loadInfo(true); }, 13000);
       }
-      paintEngine();
-      toast(d.message || '阅读引擎没有起来', true);
-    }).catch(function () {
-      S.waking = false;
-      paintEngine();
-      toast('阅读引擎没有起来', true);
-    });
+      // 不在进入书房时自动拉起 Reader：客厅里没有任何地方会启动 Reader.app，
+      // 只有它已经自己开着时，这里才会把它当兜底用。
+    }).catch(function () { if (!silent) toast('书房没连上', 'err'); });
   }
 
   /* ── 书架 ── */
   function renderShelf() {
     var el = $('shelfList');
     if (!S.shelf.length) {
-      el.innerHTML = '<div class="shelf-empty">书架是空的。<br>搜一本书，读的时候点「加入书架」。</div>';
+      el.innerHTML = '<div class="shelf-empty">书架是空的。<br>搜一本书，读的时候点「加入书架」；收进书架后可随时移出。</div>';
       paintStats();
       return;
     }
     var frag = document.createDocumentFragment();
-    S.shelf.slice(0, 20).forEach(function (b, i) {
+    // ★ 2026-11-22：原来固定只渲染前 20 本且无提示。现在默认 20 本、
+    //   有更多时给出「还有 N 本 · 展开全部」，点击可切换。
+    var SHELF_PAGE = 20;
+    var showAll = renderShelf._all === true;
+    var shown = showAll ? S.shelf : S.shelf.slice(0, SHELF_PAGE);
+    if (S.shelf.length > SHELF_PAGE) {
+      var moreWrap = document.createElement('div');
+      moreWrap.className = 'shelf-more';
+      moreWrap.style.cssText = 'padding:8px 2px;opacity:.75;font-size:12px;cursor:pointer;text-decoration:underline';
+      moreWrap.textContent = showAll
+        ? '收起（只看前 ' + SHELF_PAGE + ' 本）'
+        : '还有 ' + (S.shelf.length - SHELF_PAGE) + ' 本未显示（共 ' + S.shelf.length + ' 本）· 展开全部';
+      moreWrap.setAttribute('role', 'button');
+      moreWrap.tabIndex = 0;
+      moreWrap.onclick = function () { renderShelf._all = !renderShelf._all; renderShelf(); };
+      frag.appendChild(moreWrap);
+    }
+    shown.forEach(function (b, i) {
       var btn = document.createElement('div');
       btn.className = 'shelf-item';
       btn.dataset.i = String(i);
@@ -743,8 +1002,9 @@ body.reading-full .full-exit{display:inline-flex}
       var del = document.createElement('button');
       del.type = 'button';
       del.className = 'shelf-del';
-      del.textContent = '删除';
-      del.title = '从书架删除';
+      del.textContent = '移出';
+      del.title = '从书架移出';
+      del.setAttribute('aria-label', '从书架移出' + (b.name ? '：' + b.name : ''));
       del.addEventListener('click', function (ev) {
         ev.stopPropagation();
         ev.preventDefault();
@@ -808,22 +1068,22 @@ body.reading-full .full-exit{display:inline-flex}
     }).then(function (d) {
       if (d.ok) {
         applyShelfItems(d.items);
-        toast('已加入书架');
+        toast('已加入书架', 'good');
       } else {
-        toast(d.message || '加入书架失败', true);
+        toast(d.message || '加入书架失败', 'err');
       }
-    }).catch(function (e) { toast('加入书架失败：' + (e.message || e), true); });
+    }).catch(function (e) { toast('加入书架失败：' + (e.message || e), 'err'); });
   }
 
   function removeShelfBook(bookUrl) {
     apiPost('/api/book/shelf/remove', { bookUrl: bookUrl }).then(function (d) {
       if (d.ok) {
         applyShelfItems(d.items);
-        toast('已从书架删除');
+        toast('已从书架移出', 'good');
       } else {
-        toast(d.message || '删除失败', true);
+        toast(d.message || '移出失败', 'err');
       }
-    }).catch(function (e) { toast('删除失败：' + (e.message || e), true); });
+    }).catch(function (e) { toast('移出失败：' + (e.message || e), 'err'); });
   }
 
   function loadShelf() {
@@ -833,13 +1093,19 @@ body.reading-full .full-exit{display:inline-flex}
   }
 
   /* ── 搜索结果 ── */
-  function emptyState(title, text, chips) {
+  function emptyState(title, text, chips, opts) {
+    var o = opts || {};
     var chipHtml = (chips || []).map(function (q) {
       return '<button type="button" data-q="' + esc(q) + '">' + esc(q) + '</button>';
     }).join('');
-    return '<div class="empty-state" style="grid-column:1/-1">' +
+    // ★ 2026-11-22：支持「不可用」变体 + 动作按钮（S4 契约：没有动作的不可用态不合格）
+    var actHtml = o.action
+      ? '<div class="empty-chips" style="margin-top:14px"><button type="button" id="' +
+        esc(o.action.id) + '">' + esc(o.action.label) + '</button></div>'
+      : '';
+    return '<div class="empty-state' + (o.tone === 'unavailable' ? ' unavailable' : '') + '" style="grid-column:1/-1">' +
       '<div class="empty-mark">书</div><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p>' +
-      (chipHtml ? '<div class="empty-chips">' + chipHtml + '</div>' : '') + '</div>';
+      (chipHtml ? '<div class="empty-chips">' + chipHtml + '</div>' : '') + actHtml + '</div>';
   }
 
   function bindChips() {
@@ -916,7 +1182,7 @@ body.reading-full .full-exit{display:inline-flex}
     if (!q) {
       title.textContent = '找一本书';
       sub.textContent = '输入书名或作者，回车开始';
-      el.innerHTML = emptyState('从一本想读的书开始', '会同时搜 Reader 里的全部可搜索书源，不只是顶点小说。点开结果直接取目录和正文，想留下就点「加入书架」。', ['流浪地球', '三体', '诡秘之主', '庆余年']);
+      el.innerHTML = emptyState('从一本想读的书开始', '会同时搜本地书源库里的全部可搜索书源，不只是顶点小说。点开结果直接取目录和正文，想留下就点「加入书架」。', ['流浪地球', '三体', '诡秘之主', '庆余年']);
       bindChips();
       return;
     }
@@ -990,7 +1256,7 @@ body.reading-full .full-exit{display:inline-flex}
     if (!b || !b.name) return;
     $('q').value = b.name;
     search();
-    toast('在书源里找《' + b.name + '》，等几秒');
+    toast('在书源里找《' + b.name + '》，等几秒', 'info');
   }
 
   function renderRecommend(items) {
@@ -1062,6 +1328,7 @@ body.reading-full .full-exit{display:inline-flex}
     clearTimeout(S.searchTimer);
     resetStreaming();
     showRecommend(false);
+    document.body.classList.toggle('is-searching', !!q);
     if (!q) {
       renderResults([], '');
       showRecommend(true);
@@ -1074,15 +1341,20 @@ body.reading-full .full-exit{display:inline-flex}
       if (!d.ok) {
         $('resultTitle').textContent = '搜书失败';
         $('resultSub').textContent = d.message || '书源没有响应';
-        $('results').innerHTML = emptyState('这次没搜成', d.message || '书源没有响应，过一会儿再试。', ['流浪地球', '三体']);
+        // ★ 不可用态而不是「空」：书源是外部站点，全部超时不是「没有这本书」。
+        $('results').innerHTML = emptyState('书源暂时都连不上',
+          (d.message || '外部书源没有响应') + '。已经加入书架的书仍然能读，本地缓存过的章节不受影响。',
+          [], { tone: 'unavailable', action: { id: 'searchRetry', label: '重新试一次' } });
         bindChips();
-        toast(d.message || '搜书失败', true);
+        var srb = $('searchRetry');
+        if (srb) srb.onclick = function () { var b = $('btnSearch'); if (b) b.click(); };
+        toast(d.message || '搜书失败', 'err');
         return;
       }
       S.searchJob = d.job.id;
       pollSearchJob(d.job.id, q, seq);
     }).catch(function () {
-      toast('搜书失败，书房没连上', true);
+      toast('搜书失败，书房没连上', 'err');
       $('resultTitle').textContent = '搜书失败';
     });
   }
@@ -1092,7 +1364,7 @@ body.reading-full .full-exit{display:inline-flex}
     apiGet('/api/book/search-status?job=' + encodeURIComponent(id)).then(function (d) {
       if (seq !== S.searchSeq) return;
       if (!d.ok || !d.job) {
-        toast(d.message || '搜书任务丢了', true);
+        toast(d.message || '搜书任务丢了', 'err');
         $('resultTitle').textContent = '搜书失败';
         return;
       }
@@ -1120,11 +1392,15 @@ body.reading-full .full-exit{display:inline-flex}
         S.lastRevision = Number(job.revision);
         renderResults(job.items || [], q, job.stats);
         $('resultTitle').textContent = '搜索结果';
-        $('resultSub').textContent = '搜索完成，共 ' + S.results.length + ' 条（' + withRes + ' 个源有结果）';
+        // 到总时限提前收手时，如实说明「还有源没搜」，不要报成完整搜索
+        var tail = job.deadlineHit
+          ? '（' + withRes + ' 个源有结果 · 还有源没搜完，可再点一次搜索补齐）'
+          : '（' + withRes + ' 个源有结果）';
+        $('resultSub').textContent = '搜索完成，共 ' + S.results.length + ' 条' + tail;
         $('searchHint').textContent = '全部书源 ·「' + q + '」';
         $('clearSearch').classList.add('on');
         if (!S.results.length) {
-          toast('搜完了 ' + total + ' 个源，没有找到可读的结果', true);
+          toast('搜完了 ' + total + ' 个源，没有找到可读的结果', 'err');
         }
         return;
       }
@@ -1133,7 +1409,7 @@ body.reading-full .full-exit{display:inline-flex}
         $('resultSub').textContent = job.error || '书源搜索出错';
         $('results').innerHTML = emptyState('这次没搜成', job.error || '书源没有响应，过一会儿再试。', ['流浪地球', '三体']);
         bindChips();
-        toast(job.error || '搜书失败', true);
+        toast(job.error || '搜书失败', 'err');
         return;
       }
     }).catch(function () {
@@ -1162,7 +1438,7 @@ body.reading-full .full-exit{display:inline-flex}
       hideLoading();
       S.busy = false;
       if (!d.ok) {
-        toast(d.message || '打开失败', true);
+        toast(d.message || '打开失败', 'err');
         return;
       }
       S.book = d.book;
@@ -1171,7 +1447,7 @@ body.reading-full .full-exit{display:inline-flex}
       S.prefetchTasks = {};
       S.bookToken += 1;
       if (!S.chapters.length) {
-        toast('这本书没有取到目录', true);
+        toast('这本书没有取到目录', 'err');
         return;
       }
       renderBookHeader();
@@ -1189,7 +1465,11 @@ body.reading-full .full-exit{display:inline-flex}
     }).catch(function (e) {
       hideLoading();
       S.busy = false;
-      toast('打开失败：' + (e.message || e), true);
+      var msg = '打开失败：' + (e.message || e);
+      toast(msg, 'err');
+      showChapterError(e.message || String(e), function () {
+        if (S.book && S.book.bookUrl) openBook(S.book.bookUrl, 0);
+      });
     });
   }
 
@@ -1197,13 +1477,14 @@ body.reading-full .full-exit{display:inline-flex}
     var b = S.book || {};
     $('bookName').textContent = b.name || '未命名';
     $('bookAuthor').textContent = b.author || '佚名';
-    $('bookSource').textContent = b.originName || 'Reader 书源';
+    $('bookSource').textContent = b.originName || '本地书源';
     $('bookIntro').textContent = b.intro || '';
     setCover($('bookCover'), b.name, b.coverUrl);
     document.title = (b.name || '书房') + ' · 书房';
   }
 
   function showReaderView(on) {
+    document.body.classList.toggle('is-reading', !!on);
     $('homeView').hidden = !!on;
     $('readerView').hidden = !on;
     if (on) {
@@ -1365,8 +1646,9 @@ body.reading-full .full-exit{display:inline-flex}
 
   function failChapter(message) {
     S.busyChapter = false;
-    $('chapterContent').innerHTML = '<p class="err">这一章没有取到正文。<br>' + esc(message || '书源没有响应') + '</p>';
-    toast(message || '取正文失败', true);
+    $('chapterContent').innerHTML = '<div class="empty error"><b>这一章没有取到正文</b><span>' +
+      esc(message || '书源没有响应') + '</span></div>';
+    toast(message || '取正文失败', 'err');
   }
 
   function loadChapter(i) {
@@ -1585,18 +1867,36 @@ body.reading-full .full-exit{display:inline-flex}
   /* ── 书源库 ── */
   function openSources() {
     $('sourceModal').hidden = false;
-    var info = S.info || {};
-    var groups = Array.isArray(info.groups) ? info.groups : [];
     var chips = $('groupChips');
-    chips.innerHTML = '';
-    groups.slice(0, 24).forEach(function (g) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = (g.name || g.group || '未分组') + (g.count ? ' ' + g.count : '');
-      b.addEventListener('click', function () { loadSources('group', g.name || g.group); });
-      chips.appendChild(b);
+    // ★ 2026-11-22 修「书源库弹窗全空」：原写法读 S.info.groups，
+    //   但后端从 11-22 起已不再随 info 下发分组明细
+    //   （lib/reader_query.py:101-110「分组明细改走 mode=groups 按需拉」）。
+    //   实测 /api/book/info 的 groups 已经是 undefined（连空数组都不是），
+    //   于是 chips 一个都不显示，紧接着 loadSources('group', undefined) 拼出
+    //   ?group= 返回空列表 —— 用户看到「空分组 + 空列表」，且看起来像正常。
+    //   现在改成打开时按需拉 /api/book/groups，并补三态。
+    chips.innerHTML = '<span class="modal-empty">正在读分组…</span>';
+    apiGet('/api/book/groups').then(function (d) {
+      var groups = (d && d.ok && Array.isArray(d.groups)) ? d.groups : [];
+      chips.innerHTML = '';
+      if (!groups.length) {
+        // 空态必须说清：不能让 chips 静默空着，那会被读成「本来就没分组」
+        chips.innerHTML = '<span class="modal-empty">' + esc((d && d.message) || '没有读到分组') + '</span>';
+        $('sourceList').innerHTML = '<div class="modal-empty">选一个分组或用左侧搜书。</div>';
+        return;
+      }
+      groups.slice(0, 24).forEach(function (g) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = (g.name || '未分组') + (g.count ? ' ' + g.count : '');
+        b.addEventListener('click', function () { loadSources('group', g.name); });
+        chips.appendChild(b);
+      });
+      // 首屏用真实第一个分组名，不再传 undefined
+      loadSources('group', groups[0].name);
+    }).catch(function (e) {
+      chips.innerHTML = '<span class="modal-empty">' + esc(wwDescribeError(e, '书房')) + '</span>';
     });
-    loadSources('group', groups[0] && (groups[0].name || groups[0].group));
   }
 
   function loadSources(kind, value) {
@@ -1643,6 +1943,7 @@ body.reading-full .full-exit{display:inline-flex}
     $('q').value = '';
     S.currentQuery = '';
     resetStreaming();
+    document.body.classList.remove('is-searching');
     renderResults([], '');
     showRecommend(true);
     $('q').focus();
@@ -1686,14 +1987,6 @@ body.reading-full .full-exit{display:inline-flex}
     if (S.fullscreen) exitFullscreen(); else enterFullscreen();
   });
   $('fullExit').addEventListener('click', exitFullscreen);
-
-  $('engine').addEventListener('click', function () {
-    if (S.info && S.info.webRunning) {
-      loadInfo(true);
-      return;
-    }
-    wakeEngine();
-  });
 
   $('openSources').addEventListener('click', openSources);
   $('closeSources').addEventListener('click', function () { $('sourceModal').hidden = true; });
@@ -1796,36 +2089,31 @@ body.reading-full .full-exit{display:inline-flex}
     var t = s.toString().trim();
     return t.length > 1200 ? t.slice(0, 1200) : t;
   }
-  function toast2(msg, bad) {
-    var t = document.getElementById('toast');
-    if (t) { t.textContent = msg; t.className = 'toast on' + (bad ? ' bad' : ''); setTimeout(function () { t.className = 'toast'; }, 2200); return; }
-    alert(msg);
-  }
 
   function build() {
     var css = document.createElement('style');
     css.textContent = [
       '#wuwuNoteBtn{position:fixed;right:18px;bottom:22px;z-index:60;display:none;align-items:center;gap:6px;',
-      'font:12px/1 -apple-system,"PingFang SC",sans-serif;letter-spacing:.04em;color:#efe9df;',
+      'font:12px/1 -apple-system,"PingFang SC",sans-serif;letter-spacing:.04em;color:#efe9dd;',
       'padding:10px 13px;border-radius:9px;border:1px solid rgba(192,183,156,.36);',
       'background:rgba(18,20,24,.94);box-shadow:0 14px 34px -18px rgba(0,0,0,.9);cursor:pointer;backdrop-filter:blur(8px)}',
       '#wuwuNoteBtn:hover{border-color:rgba(192,183,156,.7);color:#c0b79c}',
       '#wuwuNotePanel{position:fixed;right:18px;bottom:64px;z-index:61;display:none;width:min(380px,92vw);',
       'background:#101216;border:1px solid rgba(239,233,223,.14);border-radius:12px;padding:14px 15px;',
-      'box-shadow:0 30px 70px -30px rgba(0,0,0,.95);font:12.5px/1.7 -apple-system,"PingFang SC",sans-serif;color:#efe9df}',
+      'box-shadow:0 30px 70px -30px rgba(0,0,0,.95);font:12.5px/1.7 -apple-system,"PingFang SC",sans-serif;color:#efe9dd}',
       '#wuwuNotePanel .h{display:flex;align-items:center;gap:8px;margin-bottom:9px}',
       '#wuwuNotePanel .h b{font-size:13px;letter-spacing:.08em}',
-      '#wuwuNotePanel .h i{font-style:normal;font-size:10.5px;color:#5e5b55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '#wuwuNotePanel .h i{font-style:normal;font-size:11px;color:#5e5b55;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '#wuwuNotePanel .x{margin-left:auto;background:none;border:0;color:#918c83;cursor:pointer;font:inherit}',
       '#wuwuNotePanel textarea,#wuwuNotePanel input{width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px 10px;',
-      'font:12.5px/1.7 inherit;color:#efe9df;background:rgba(255,255,255,.04);border:1px solid rgba(239,233,223,.1);',
+      'font:12.5px/1.7 inherit;color:#efe9dd;background:rgba(255,255,255,.04);border:1px solid rgba(239,233,223,.1);',
       'border-radius:7px;outline:none;resize:vertical}',
       '#wuwuNotePanel textarea:focus,#wuwuNotePanel input:focus{border-color:rgba(192,183,156,.45)}',
       '#wuwuNotePanel .q{max-height:92px;overflow:auto;font-family:"Songti SC",serif;color:#cbc4b8;',
       'border-left:2px solid rgba(192,183,156,.4);padding:2px 0 2px 9px;margin-bottom:8px}',
       '#wuwuNotePanel .acts{display:flex;gap:8px;justify-content:flex-end}',
       '#wuwuNotePanel .acts button{font:12px inherit;padding:7px 12px;border-radius:7px;cursor:pointer;border:1px solid rgba(239,233,223,.14);',
-      'background:rgba(255,255,255,.03);color:#efe9df}',
+      'background:rgba(255,255,255,.03);color:#efe9dd}',
       '#wuwuNotePanel .acts .ok{background:rgba(192,183,156,.16);border-color:rgba(192,183,156,.4);color:#c0b79c}',
       '@media (max-width:560px){#wuwuNoteBtn{right:12px;bottom:14px;padding:9px 11px}#wuwuNotePanel{right:12px;bottom:56px;width:min(340px,94vw);max-height:62vh;overflow:auto}}',
     ].join('');
@@ -1884,10 +2172,10 @@ body.reading-full .full-exit{display:inline-flex}
     if (saving) return;
     var quote = (quoteBox.dataset.text || '').trim();
     var body = bodyBox.value.trim();
-    if (!quote && !body) { toast2('选中一句，或者写一句', true); return; }
+    if (!quote && !body) { toast('选中一句，或者写一句', 'err'); return; }
     saving = true;
     panel.querySelector('#wuwuNoteSave').textContent = '存…';
-    fetch('/api/notes/create', {
+    wwFetch('/api/notes/create', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -1903,10 +2191,10 @@ body.reading-full .full-exit{display:inline-flex}
       if (!d.ok) throw new Error(d.message || '存不进去');
       lastSel = '';
       close();
-      toast2('已存进笔记库');
+      toast('已存进笔记库', 'good');
       document.dispatchEvent(new CustomEvent('wuwu:note-saved'));
     }).catch(function (e) {
-      toast2('没存上：' + (e.message || e), true);
+      toast('没存上：' + (e.message || e), 'err');
     }).finally(function () {
       saving = false;
       var b = panel.querySelector('#wuwuNoteSave');

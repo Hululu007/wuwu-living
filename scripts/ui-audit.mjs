@@ -21,12 +21,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const argOf = (k, d) => {
   const i = args.indexOf(k);
   return i >= 0 ? args[i + 1] : d;
 };
+/* ★★ 2026-11-22 修「参数写了不生效」（真缺陷）：
+ *   原写法 ROOT 写死成脚本上一级目录，而 `--root` 参数被解析后
+ *   **从未被使用** —— 于是它只能扫自己所在的工程，传别的路径也无效。
+ *   实测：`--root /tmp/uifix` 仍扫了五五客厅的 52 条 rgba，夹具一条没进去。
+ *   现在：传了 --root 就用它，没传才回到脚本上一级。 */
+const ROOT = path.resolve(argOf('--root', path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')));
 const OUT = path.resolve(ROOT, argOf('--out', 'runtime/ui-audit.json'));
 const RENDER_FILE = argOf('--render', '');
 
@@ -58,7 +63,28 @@ const EXTERNAL_APPS = [
 
 /* ── 基础正则 ──────────────────────────────────────────────── */
 const HEX_RE = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
-const RGB_RE = /rgba?\(\s*\d{1,3}[^)]*\)/g;
+// ★ 2026-11-22 修「嵌套函数被截断」：原写法 rgba?\(\s*\d{1,3}[^)]*\) 用 [^)]*
+//   一旦里面有嵌套括号就提前收尾，实测三种形态：
+//     rgba(239,233,221,.18)              → 正常
+//     rgba(239,233,221,calc(.18 * 2))    → 只截到 "rgba(239,233,221,calc(.18 * 2)"（少一个右括号）
+//     rgba(var(--r),var(--g),var(--b),.5) → **完全不匹配**（\d{1,3} 就不过）
+//   后两种会让「字面色值有多少种」这个数偏低，且是静默的。
+//   现在改括号配平：匹配 rgb(/rgba( 后一直走到对应的右括号，不看内容。
+function scanRgbLiterals(css){
+  const out = [];
+  const re = /rgba?\(/g;
+  let m;
+  while ((m = re.exec(css)) !== null) {
+    let i = m.index + m[0].length, depth = 1;
+    while (i < css.length && depth > 0) {
+      if (css[i] === '(') depth++;
+      else if (css[i] === ')') depth--;
+      i++;
+    }
+    if (depth === 0) out.push(css.slice(m.index, i));
+  }
+  return out;
+}
 const DECL_RE = /([a-z-]+)\s*:\s*([^;}]+)/g;
 const DURATION_RE = /[\d.]+(?:ms|s)\b/g;
 const LENGTH_RE = /-?[\d.]+(?:px|rem|em|vh|vw|%)\b/g;
@@ -118,8 +144,8 @@ function auditCss(css) {
     const hex = m[0].toLowerCase();
     colors.set(hex, (colors.get(hex) || 0) + 1);
   }
-  for (const m of css.matchAll(RGB_RE)) {
-    const v = m[0].replace(/\s+/g, '');
+  for (const lit of scanRgbLiterals(css)) {
+    const v = lit.replace(/\s+/g, '');
     rgbLiterals.set(v, (rgbLiterals.get(v) || 0) + 1);
   }
 
@@ -306,15 +332,28 @@ report.rollups = {
   easings: localMerged.easings,
   transitionCount: localMerged.transitionCount,
   animationCount: localMerged.animationCount,
-  stateMatrix: report.localPages.map((p) => ({
-    route: p.route, room: p.room,
-    empty: p.states.empty.found, loading: p.states.loading.found,
-    errorState: p.states.errorState,
-    errorMarkup: p.states.errorMarkup.found, errorText: p.states.errorText.found,
-    catchHandlers: p.states.catchHandlers,
-    emptySamples: p.states.empty.samples, loadingSamples: p.states.loading.samples,
-    errorSamples: [...p.states.errorMarkup.samples, ...p.states.errorText.samples].slice(0, 3),
-  })),
+  /* ★ 2026-11-22 修「文件读不到就整个崩」（容错缺陷）：
+   *   auditPage() 在 src==null 时返回 states:null，但这里无条件读 p.states.empty →
+   *   TypeError: Cannot read properties of null。后果不是「该页标未读到」，
+   *   而是**整份报告都拿不到**—— 一个页缺失让全部结论丢失。
+   *   现在：缺文件的页单独标记 unreadable，其余页照常出结论。 */
+  stateMatrix: report.localPages.map((p) => {
+    if (!p.states) {
+      return { route: p.route, room: p.room, unreadable: true,
+        empty: false, loading: false, errorState: 'unreadable',
+        errorMarkup: false, errorText: false, catchHandlers: 0,
+        emptySamples: [], loadingSamples: [], errorSamples: [] };
+    }
+    return {
+      route: p.route, room: p.room,
+      empty: p.states.empty.found, loading: p.states.loading.found,
+      errorState: p.states.errorState,
+      errorMarkup: p.states.errorMarkup.found, errorText: p.states.errorText.found,
+      catchHandlers: p.states.catchHandlers,
+      emptySamples: p.states.empty.samples, loadingSamples: p.states.loading.samples,
+      errorSamples: [...p.states.errorMarkup.samples, ...p.states.errorText.samples].slice(0, 3),
+    };
+  }),
 };
 
 /* 颜色分类归组（同语义多值线索） */
@@ -376,7 +415,9 @@ const summary = {
   distinctHex: report.rollups.colors.length,
   distinctRadius: report.rollups.radius.length,
   distinctFontSize: report.rollups.fontSize.length,
-  states: report.rollups.stateMatrix.map((s) => `${s.room}:${s.empty ? '空' : '—'}${s.loading ? '载' : '—'}${s.errorState === 'error-panel' ? '错' : s.errorState === 'catch-toast-only' ? '捕' : '—'}`).join(' '),
+  states: report.rollups.stateMatrix.map((s) => s.unreadable
+    ? `${s.room}:未读到`
+    : `${s.room}:${s.empty ? '空' : '—'}${s.loading ? '载' : '—'}${s.errorState === 'error-panel' ? '错' : s.errorState === 'catch-toast-only' ? '捕' : '—'}`).join(' '),
   out: OUT,
 };
 console.log(JSON.stringify(summary, null, 2));
